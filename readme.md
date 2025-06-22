@@ -1,5 +1,5 @@
-readme
-# Project Overview
+# Read Me
+## Project Overview
 
 This repository contains practice materials and notes for Python and SQL.
 
@@ -13,3 +13,4 @@ This repository contains practice materials and notes for Python and SQL.
 
 - **notes.ipynb**  
   Jupyter notebook for taking notes, explanations, and additional learning resources.
+
