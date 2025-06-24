@@ -92,8 +92,68 @@ FROMX table;
 */
 
 /*markdown
+##### Engagement with Facebook Events
+As a Data Scientist on the Facebook Events Discovery team, you are tasked with analyzing user interaction with event recommendations to enhance the relevance of these suggestions. Your goal is to identify which event categories receive the most user clicks, determine if users are engaging with events in their preferred categories, and understand user engagement patterns by analyzing click data. This analysis will help optimize recommendation algorithms to increase user satisfaction and event attendance.
+
+Question 1 of 3
+
+
+*/
+
+/*markdown
+###### How many times did users click on event recommendations for each event category in March 2024? Show the category name and the total clicks.
+
+
+*/
+
+SELECT category_name, COUNT(click_id)
+FROM fct_event_clicks c
+  JOIN dim_events d
+  ON c.event_id = d.event_id
+WHERE click_date LIKE "2024-03%"
+GROUP BY 1
+-- Nothing too fancy here, simple count, join, and filter
+
+/*markdown
+###### For event clicks in March 2024, identify whether each user clicked on an event in their preferred category. Return the user ID, event category, and a label indicating if it was a preferred category ('Yes' or 'No').
+
+
+*/
+
+SELECT u.user_id, category_name,
+CASE WHEN e.category_name = u.preferred_category THEN "Yes"
+ELSE "No"
+END AS category_match
+FROM fct_event_clicks c
+JOIN dim_events e
+ON c.event_id = e.event_id
+JOIN dim_users u
+ON u.user_id = c.user_id
+WHERE c.click_date LIKE "2024-03%"
+-- A little more complex as there are two joins, but ultimately still a simple CASE with a filter.
+
+/*markdown
+###### Generate a report that combines the user ID, their full name (first and last name), and the total clicks for events they interacted with in March 2024. Sort the report by user ID in ascending order.
+
+
+*/
+
+SELECT dim_users.user_id, CONCAT(first_name, " ", last_name), COUNT(click_id)
+FROM dim_users
+JOIN fct_event_clicks
+ON dim_users.user_id = fct_event_clicks.user_id
+WHERE fct_event_clicks.click_date LIKE "2024-03%"
+GROUP BY 1
+ORDER BY 1 ASC
+
+/*markdown
+This one felt pretty easy, I think because it mostly focused on my ability to join multiple tables correctly, something I'm very comfortable with.
+*/
+
+/*markdown
 ##### App Download Conversion Rates by Category
 ###### You are on the Google Play store's App Marketplace team. You and your team want to understand how different app categories convert from browsing to actual downloads. This analysis is critical in informing future product placement and marketing strategies for app developers and users.
+*/
 
 Tables <br>
 Explore data<br>
