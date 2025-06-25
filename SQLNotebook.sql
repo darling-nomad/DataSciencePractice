@@ -249,16 +249,34 @@ Takeaway: It's important to remember that it's unwise to apply filters on multip
 */
 
 /*markdown
-##### The problem
+### Data Lemur
 */
-
--- The code
 
 /*markdown
-The takeaway
+###### 3-Topping Pizzas
+
+You’re a consultant for a major pizza chain that will be running a promotion where all 3-topping pizzas will be sold for a fixed price, and are trying to understand the costs involved.
+
+Given a list of pizza toppings, consider all the possible 3-topping pizzas, and print out the total cost of those 3 toppings. Sort the results with the highest total cost on the top followed by pizza toppings in ascending order.
+
+Break ties by listing the ingredients in alphabetical order, starting from the first ingredient, followed by the second and third.
+
+
+
 */
 
+WITH cte1 AS (SELECT * FROM pizza_toppings),
+cte2 AS (SELECT * FROM pizza_toppings)
+SELECT CONCAT(cte1.topping_name, ',' ,cte2.topping_name, ',', p.topping_name), cte1.ingredient_cost + cte2.ingredient_cost + p.ingredient_cost AS total_cost
+FROM cte1
+CROSS JOIN cte2
+CROSS JOIN pizza_toppings p
+WHERE cte1.topping_name < cte2.topping_name AND cte2.topping_name < p.topping_name
+ORDER BY 2 DESC, 1 ASC
 
+/*markdown
+This one was really interesting! I didn't struggle with duplicating the tables really, but figuring out how to remove the duplicate toppings options was tricky. I initially did topping1 != topping2 || topping3 and that made sure there were no repeated toppings in the same list, but it didn't account for reorderings of toppings. I looked at the hint and saw the solution and it was so simple it blew my mind. topping1 < topping2 < topping3
+*/
 
 /*markdown
 ### Jump To
