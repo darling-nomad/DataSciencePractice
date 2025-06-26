@@ -92,8 +92,149 @@ FROMX table;
 */
 
 /*markdown
+##### Reorder Patterns for Amazon Fresh
+*/
+
+/*markdown
+###### As a Data Analyst on the Amazon Fresh product team, you and your team are focused on enhancing the customer experience by streamlining the process for customers to reorder their favorite grocery items. Your goal is to identify the most frequently reordered product categories, understand customer preferences for these products, and calculate the average reorder frequency across categories. By analyzing these metrics, you aim to provide actionable insights that will inform strategies to improve customer satisfaction and retention.
+
+Question 1 of 3
+
+The product team wants to analyze the most frequently reordered product categories. Can you provide a list of the product category codes (using first 3 letters of product code) and their reorder counts for Q4 2024?
+
+
+*/
+
+SELECT SUBSTR(product_code, 1, 3) AS product_category_code,
+  COUNT(order_id)
+FROM dim_products p
+JOIN fct_orders o
+ON p.product_id = o.product_id
+WHERE order_date BETWEEN "2024-10-01" AND "2024-12-31"
+  AND reorder_flag = 1
+ GROUP BY 1
+
+/*markdown
+###### To better understand customer preferences, the team needs to know the details of customers who reorder specific products. Can you retrieve the customer information along with their reordered product code(s) for Q4 2024?
+
+
+
+*/
+
+SELECT o.customer_id, customer_name, product_code, count(order_id)
+FROM fct_orders o
+JOIN dim_products p
+ON p.product_id = o.product_id
+JOIN dim_customers c
+ON c.customer_id = o.customer_id
+WHERE order_date BETWEEN "2024-10-01" AND "2024-12-31"
+AND reorder_flag = 1
+GROUP BY 1,2,3
+
+/*markdown
+###### When calculating the average reorder frequency, it's important to handle cases where reorder counts may be missing or zero. Can you compute the average reorder frequency across the product categories, ensuring that any missing or null values are appropriately managed for Q4 2024?
+
+
+
+*/
+
+WITH cte AS (
+  SELECT category, COUNT(order_id) AS total_orders
+  FROM fct_orders
+  JOIN dim_products
+  ON fct_orders.product_id = dim_products.product_id
+  WHERE order_date BETWEEN "2024-10-01" AND "2024-12-31"
+GROUP BY 1
+), cte2 AS (
+  SELECT category, COUNT(order_id) AS total_reorders
+  FROM fct_orders
+  JOIN dim_products
+  ON fct_orders.product_id = dim_products.product_id
+  WHERE order_date BETWEEN "2024-10-01" AND "2024-12-31"
+    AND reorder_flag = 1
+GROUP BY 1
+)
+SELECT cte.category, COALESCE(total_reorders / total_orders,0) AS avg_freq
+FROM cte
+LEFT JOIN cte2
+  ON cte.category = cte2.category
+
+/*markdown
+The thing that stuck me was that I needed to add coalesce to the final query. I correctly used CTEs to filter and aggregate the queries, but in order to keep categories with no reorders from dropping off, I needed to use COALESCE to convert the null values to 0.
+*/
+
+/*markdown
+##### Device Integration with Amazon Services
+
+*/
+
+/*markdown
+###### As a Data Analyst on the Amazon Devices team, you are tasked with evaluating the usage patterns of Amazon services on devices like Echo, Fire TV, and Kindle. Your goal is to categorize device usage, assess overall engagement levels, and analyze the contribution of Prime Video and Amazon Music to total usage. This analysis will inform strategies to optimize service offerings and improve customer satisfaction.
+
+Question 1 of 3
+
+The team wants to identify the total usage duration of the services for each device type by extracting the primary device category from the device name for the period from July 1, 2024 to September 30, 2024. The primary device category is derived from the first word of the device name.
+
+
+*/
+
+SELECT SUBSTR(device_name, 1, (INSTR(device_name, " ") - 1)) AS device_type,
+  SUM(usage_duration_minutes) AS usage_sum
+FROM fct_device_usage u
+  JOIN dim_device d
+  ON u.device_id = d.device_id
+WHERE usage_date BETWEEN "2024-07-01" AND "2024-09-30"
+GROUP BY 1
+
+/*markdown
+###### The team also wants to label the usage of each device category into 'Low' or 'High' based on usage duration from July 1, 2024 to September 30, 2024. If the total usage time was less than 300 minutes, we'll category it as 'Low'. Otherwise, we'll categorize it as 'high'. Can you return a report with device ID, usage category and total usage time?
+*/
+
+SELECT d.device_id, CASE
+   WHEN SUM(usage_duration_minutes) < 300 THEN "LOW"
+   ELSE "HIGH" END AS usage_category,
+  SUM(usage_duration_minutes) AS usage_sum
+FROM fct_device_usage u
+  JOIN dim_device d
+  ON u.device_id = d.device_id
+WHERE usage_date BETWEEN "2024-07-01" AND "2024-09-30"
+GROUP BY 1;
+
+/*markdown
+###### The team is considering bundling the Prime Video and Amazon Music subscription. They want to understand what percentage of total usage time comes from Prime Video and Amazon Music services respectively. Please use data from July 1, 2024 to September 30, 2024.
+
+
+*/
+
+WITH cte AS (
+  SELECT SUM(usage_duration_minutes) AS total_usage
+  FROM fct_device_usage
+  WHERE usage_date BETWEEN "2024-07-01" AND "2024-09-30"
+), cte2 AS(
+  SELECT s.service_name, SUM(usage_duration_minutes) AS usage_by_service
+  FROM fct_device_usage u
+  JOIN dim_service s
+  ON u.service_id = s.service_id
+  WHERE usage_date BETWEEN "2024-07-01" AND "2024-09-30"
+    AND (service_name = "Amazon Music" OR service_name = "Prime Video")
+GROUP BY 1
+)
+SELECT cte2.service_name, ROUND(usage_by_service / total_usage,2)*100 AS usage_percent
+FROM cte2
+JOIN cte
+GROUP BY 1
+
+/*markdown
+This one was pretty complicated, as it required crafting substrings and searching strings in part one, then requiring two ctes to filter and aggregate the queries correctly. But first try on all three parts!
+*/
+
+/*markdown
 ##### Engagement with Facebook Events
-As a Data Scientist on the Facebook Events Discovery team, you are tasked with analyzing user interaction with event recommendations to enhance the relevance of these suggestions. Your goal is to identify which event categories receive the most user clicks, determine if users are engaging with events in their preferred categories, and understand user engagement patterns by analyzing click data. This analysis will help optimize recommendation algorithms to increase user satisfaction and event attendance.
+
+*/
+
+/*markdown
+###### As a Data Scientist on the Facebook Events Discovery team, you are tasked with analyzing user interaction with event recommendations to enhance the relevance of these suggestions. Your goal is to identify which event categories receive the most user clicks, determine if users are engaging with events in their preferred categories, and understand user engagement patterns by analyzing click data. This analysis will help optimize recommendation algorithms to increase user satisfaction and event attendance.
 
 Question 1 of 3
 
@@ -152,21 +293,17 @@ This one felt pretty easy, I think because it mostly focused on my ability to jo
 
 /*markdown
 ##### App Download Conversion Rates by Category
-###### You are on the Google Play store's App Marketplace team. You and your team want to understand how different app categories convert from browsing to actual downloads. This analysis is critical in informing future product placement and marketing strategies for app developers and users.
+
 */
 
-Tables <br>
-Explore data<br>
-dim_app(app_id, app_name, category, app_type)<br>
-fct_app_browsing(app_id, browse_date, browse_count)<br>
-fct_app_downloads(app_id, download_date, download_count)<br>
+/*markdown
+
+###### You are on the Google Play store's App Marketplace team. You and your team want to understand how different app categories convert from browsing to actual downloads. This analysis is critical in informing future product placement and marketing strategies for app developers and users.
+*/
 
 Question 1 of 3
 
 The marketplace team wants to identify high and low performing app categories. Provide the total downloads for the app categories for November 2024. If there were no downloads for that category, return the value as 0.
-
-
-*/
 
 WITH cte AS (SELECT app_id, SUM(download_count) AS app_downloads
 FROM fct_app_downloads
