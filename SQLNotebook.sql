@@ -92,6 +92,65 @@ FROMX table;
 */
 
 /*markdown
+##### Pro Content Creator Mac Software Usage Insights
+
+*/
+
+/*markdown
+###### As a Product Analyst on the Mac software team, you are tasked with understanding user engagement with multimedia tools. Your team aims to identify key usage patterns and determine how much time users spend on these tools. The end goal is to use these insights to enhance product features and improve user experience.
+
+###### Question 1 of 3
+
+###### As a Product Analyst on the Mac software team, you need to understand the engagement of professional content creators with multimedia tools. What is the number of distinct users on the last day in July 2024?
+
+
+*/
+
+SELECT COUNT(DISTINCT user_id) FROM fct_multimedia_usage
+WHERE usage_date = "2024-07-31"
+
+/*markdown
+###### As a Product Analyst on the Mac software team, you are assessing how much time professional content creators spend using multimedia tools. What is the average number of hours spent by users during August 2024? Round the result up to the nearest whole number.
+
+
+*/
+
+ SELECT CEIL(AVG(hours_spent))
+FROM fct_multimedia_usage
+WHERE usage_date LIKE "2024-08%"
+
+
+/*markdown
+######  As a Product Analyst on the Mac software team, you are investigating exceptional daily usage patterns in September 2024. For each day, determine the distinct user count and the total hours spent using multimedia tools. Which days have both metrics above the respective average daily values for September 2024?
+
+
+
+*/
+
+WITH daily_metrics AS (
+  SELECT usage_date,
+  COUNT(DISTINCT user_id) as daily_user_count,
+  SUM(hours_spent) AS daily_hours_spent
+  FROM fct_multimedia_usage
+  WHERE usage_date LIKE "2024-09%"
+  GROUP BY usage_date
+  ),
+average_metrics AS (
+  SELECT AVG(daily_hours_spent) AS avg_hours_spent,
+  AVG(daily_user_count) AS avg_user_count
+  FROM daily_metrics
+)
+  SELECT usage_date, daily_user_count, daily_hours_spent
+FROM daily_metrics
+  JOIN average_metrics
+WHERE daily_user_count > avg_user_count
+AND daily_hours_spent > avg_hours_spent
+
+/*markdown
+I didn't know you could call one cte in another cte, that's wild. It was really cool to learn, and will definitely be an important tool in my toolbox going forward.
+*/
+
+/*markdown
 ##### Reorder Patterns for Amazon Fresh
 */
 
