@@ -92,16 +92,135 @@ FROMX table;
 */
 
 /*markdown
-##### Pro Content Creator Mac Software Usage Insights
+##### Google Pay Digital Wallet Transaction Security Patterns
 
 */
 
 /*markdown
-###### As a Product Analyst on the Mac software team, you are tasked with understanding user engagement with multimedia tools. Your team aims to identify key usage patterns and determine how much time users spend on these tools. The end goal is to use these insights to enhance product features and improve user experience.
+###### You are a Product Analyst on the Google Pay security team focused on improving the reliability of digital payments. Your team needs to analyze transaction success and failure rates across various merchant categories to identify potential friction points in payment experiences. By understanding these patterns, you aim to guide product improvements for a smoother and more reliable payment process.
 
 ###### Question 1 of 3
 
+###### For January 2024, what are the total counts of successful and failed transactions in each merchant category? This analysis will help the Google Pay security team identify potential friction points in payment processing.
+
+
+*/
+
+SELECT merchant_category, transaction_status, COUNT(transaction_status) AS transaction_status_count
+FROM fct_transactions
+WHERE transaction_date LIKE "2024-01%"
+GROUP BY 1, 2
+
+/*markdown
+###### For the first quarter of 2024, which merchant categories recorded a transaction success rate below 90%? This insight will guide our prioritization of security enhancements to improve payment reliability.
+
+*/
+
+WITH cte AS (
+  SELECT merchant_category, transaction_id, CASE
+  WHEN transaction_status = "SUCCESS" THEN 1.0
+  ELSE 0.0
+  END AS transaction_count
+FROM fct_transactions
+WHERE transaction_date BETWEEN "2024-01-01" AND "2024-03-31"
+), cte2 AS (
+  SELECT merchant_category, SUM(transaction_count) / COUNT(transaction_id) AS transaction_success_rate
+  FROM cte
+  GROUP BY 1
+)
+SELECT merchant_category, transaction_success_rate
+  FROM cte2
+  WHERE transaction_success_rate <.9
+GROUP BY 1
+
+/*markdown
+###### From January 1st to March 31st, 2024, can you generate a list of merchant categories with their concatenated counts for successful and failed transactions? Then, rank the categories by total transaction volume. This ranking will support our assessment of areas where mixed transaction outcomes may affect user experience.
+
+
+
+*/
+
+SELECT merchant_category, CONCAT(SUM(CASE
+   WHEN transaction_status = "SUCCESS" THEN 1.0
+   ELSE 0 END), "-",
+   SUM(CASE
+   WHEN transaction_status = "FAILED" THEN 1.0
+   ELSE 0 END)) AS transaction_success_rates
+FROM fct_transactions
+WHERE transaction_date BETWEEN "2024-01-01" AND "2024-03-31"
+GROUP BY 1
+ORDER BY COUNT(*) DESC
+
+/*markdown
+The takeaway
+*/
+
+/*markdown
+##### Photo Sharing Platform User Engagement Metrics
+*/
+
+/*markdown
+###### As a Product Analyst on the Facebook Photos team, you are tasked with understanding user engagement with the photo sharing feature across different age and geographic segments. Your team is particularly interested in how users under 18 or over 50, as well as international users, are utilizing these features. The insights will guide your team in tailoring product strategies and enhancements to boost engagement among these key user segments.
+
+###### Question 1 of 3
+
+###### How many photos were shared by users who are either under 18 years old or over 50 years old during July 2024? This metric will help us understand if these age segments are engaging with the photo sharing feature.
+
+
+*/
+
+SELECT COUNT(photo_id)
+FROM fct_photo_sharing
+  JOIN dim_user
+  ON fct_photo_sharing.user_id = dim_user.user_id
+WHERE (age < 18 OR age > 50)
+AND shared_date LIKE "2024-07%"
+
+/*markdown
+###### What are the user IDs and the total number of photos shared by users who are not from the United States during August 2024? This analysis will help us identify engagement patterns among international users.
+
+
+
+*/
+
+SELECT fct_photo_sharing.user_id, COUNT(photo_id)
+FROM fct_photo_sharing
+  JOIN dim_user
+  ON fct_photo_sharing.user_id = dim_user.user_id
+WHERE country != "United States" AND shared_date LIKE "2024-08%"
+GROUP BY 1
+
+/*markdown
+###### What is the total number of photos shared by users who are either under 18 years old or over 50 years old and who are not from the United States during the third quarter of 2024? This measure will inform us if there are significant differences in usage across these age and geographic segments.
+*/
+
+SELECT COUNT(photo_id)
+FROM fct_photo_sharing
+  JOIN dim_user
+  ON fct_photo_sharing.user_id = dim_user.user_id
+WHERE (age < 18 OR age > 50) AND country != "United States"
+AND shared_date BETWEEN "2024-07-01" AND "2024-09-30"
+
+/*markdown
+This one was testing my ability to use logic to construct complex conditionals for the filters. I find that particularly easy as I have a really strong backgound in logic.
+*/
+
+/*markdown
+##### Pro Content Creator Mac Software Usage Insights
+*/
+
+/*markdown
+
+###### As a Product Analyst on the Mac software team, you are tasked with understanding user engagement with multimedia tools. Your team aims to identify key usage patterns and determine how much time users spend on these tools. The end goal is to use these insights to enhance product features and improve user experience.
+*/
+
+/*markdown
+###### Question 1 of 3
+*/
+
+/*markdown
 ###### As a Product Analyst on the Mac software team, you need to understand the engagement of professional content creators with multimedia tools. What is the number of distinct users on the last day in July 2024?
+*/
 
 
 */
