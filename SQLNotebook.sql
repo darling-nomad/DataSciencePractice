@@ -7,7 +7,15 @@
 */
 
 /*markdown
-##### The problem (template)
+#### Problem Title (template)
+*/
+
+/*markdown
+##### The background
+*/
+
+/*markdown
+###### The question
 */
 
 -- The code
@@ -18,6 +26,21 @@ The takeaway
 
 /*markdown
 ### Notes
+*/
+
+/*markdown
+##### Extract single value using MAX(CASE)
+*/
+
+SELECT MAX(
+    CASE
+WHEN x THEN y
+END) AS max_case_name
+FROM table
+
+/*markdown
+CASE typically returns multiple values, so if you only want a single value, you need to use an aggregator to return only one.
+See [example](#within-may-2024-for-each-seller-id-please-generate-a-weekly-summary-that-reports-the-total-number-of-sales-transactions-and-shows-the-fee-amount-from-the-most-recent-sale-in-that-week-this-analysis-will-let-us-correlate-fee-changes-with-weekly-seller-performance-trends)
 */
 
 /*markdown
@@ -32,19 +55,18 @@ END AS case_name
 FROM table
 
 /*markdown
-Case is used like an if then in SQL
-It can bucket values into categories
-It can replace values or clean data
+Case is used like an if then in SQL <br>
+It can bucket values into categories <br>
+It can replace values or clean data <br>
 It can also be used to take inputs like 0, 1 and return True/False, or "yes"/"no" or vice versa.
 */
 
 /*markdown
 ##### Subqueries versus CTE versus Window Functions
-
 */
 
 /*markdown
-###### Subqueries are just what they sound like. A query inline within a query. We can use it to return aggregates or filter against aggregates. It can be used to update values as well.
+Subqueries are just what they sound like. A query inline within a query. We can use it to return aggregates or filter against aggregates. It can be used to update values as well.
 */
 
 SELECT value, (
@@ -57,7 +79,7 @@ FROM table
 WHERE value = (SELECT MAX(value) FROM table)
 
 /*markdown
-###### CTE or Common Table Expressions are basically tables you generate from the data so that you can refer to them. They are defined at the front of the query and must always be names. A CTE can also be used multiple times throughout a query as if it were a table.
+CTE or Common Table Expressions are basically tables you generate from the data so that you can refer to them. They are defined at the front of the query and must always be names. A CTE can also be used multiple times throughout a query as if it were a table.
 */
 
 WITH cte AS (
@@ -69,7 +91,7 @@ FROM cte
 WHERE avg_value > x
 
 /*markdown
-###### Window Functions are for when you need to perform calculations across multiple rows or sets of rows without collapsing the dataset (like you would with a grouped aggregate). It can include a typical aggregate potentially with a partition, it can index with (DENSE) RANK, ROW_NUMBER, or NTILE, or it can contain info from adjacent rows using LAG or LEAD. 
+Window Functions are for when you need to perform calculations across multiple rows or sets of rows without collapsing the dataset (like you would with a grouped aggregate). It can include a typical aggregate potentially with a partition, it can index with (DENSE) RANK, ROW_NUMBER, or NTILE, or it can contain info from adjacent rows using LAG or LEAD. 
 */
 
 SELECT SUM(value) OVER (ORDER BY second_value) AS running_total
@@ -92,18 +114,136 @@ FROMX table;
 */
 
 /*markdown
-##### Google Pay Digital Wallet Transaction Security Patterns
+#### Prime Member Exclusive Product Engagement Metrics
 
 */
 
 /*markdown
-###### You are a Product Analyst on the Google Pay security team focused on improving the reliability of digital payments. Your team needs to analyze transaction success and failure rates across various merchant categories to identify potential friction points in payment experiences. By understanding these patterns, you aim to guide product improvements for a smoother and more reliable payment process.
+##### As a Data Analyst on the Amazon Prime product analytics team, you are tasked with evaluating Prime member engagement with exclusive promotions. Your team is focused on understanding how members interact with special deals and early product access. The goal is to identify engagement patterns and target highly engaged members to enhance member value and drive higher engagement with these offerings.
 
-###### Question 1 of 3
 
+*/
+
+SELECT COUNT(DISTINCT member_id) AS deal_purchasers, COUNT(*) / COUNT(DISTINCT member_id) AS avg_purchases_per_user
+FROM fct_prime_deals
+WHERE purchase_date LIKE '2024-01%'
+
+/*markdown
+###### To gain insights into purchase patterns, what is the distribution of members based on the number of deals purchased in February 2024? Group the members into the following categories: 1-2 deals, 3-5 deals, and more than 5 deals.
+
+
+
+*/
+
+WITH cte AS (
+  SELECT member_id, COUNT(*) AS deals_per_user
+FROM fct_prime_deals
+WHERE purchase_date LIKE '2024-02%'
+GROUP BY 1
+  )
+SELECT CASE
+WHEN deals_per_user BETWEEN 1 AND 2 THEN "1-2 deals"
+WHEN deals_per_user BETWEEN 3 AND 5 THEN "3-5 deals"
+WHEN deals_per_user > 5 THEN "more than 5 deals" END AS purchase_buckets,
+  COUNT(*)
+FROM cte
+GROUP BY 1
+
+/*markdown
+###### To target highly engaged members for tailored promotions, can we identify Prime members who purchased more than 5 exclusive deals between January 1st and March 31st, 2024? How many such members are there and what is their average total spend on these deals?
+
+
+
+*/
+
+WITH high_spenders AS (
+  SELECT member_id, SUM(purchase_amount) AS purchase_sum
+  FROM fct_prime_deals
+  WHERE purchase_date BETWEEN '2024-01-01' AND '2024-03-31'
+  GROUP BY 1
+    HAVING COUNT(*) >5
+)
+SELECT count(member_id), AVG(purchase_sum) FROM high_spenders
+
+/*markdown
+I initially made this one way harder than it was, trying to use subqueries to find member ids with >5 purchases, and a seperate subquery to aggregate the sums before I took the average. A single cte was all that I needed to do both at the same time, since the count of the members ids and the average of their total spends can be easily taken from a cte grouped by ids.
+*/
+
+/*markdown
+#### Third-Party Seller Fees and Performance Metrics
+
+*/
+
+/*markdown
+###### For each seller, please identify their top sale transaction in April 2024 based on sale amount. If there are multiple transactions with the same sale amount, select the one with the most recent sale_date.
+
+
+*/
+
+WITH cte AS (
+SELECT *,
+RANK() OVER
+(PARTITION BY seller_name ORDER BY sale_amount DESC, sale_date DESC) AS ranked_by_sale
+FROM fct_seller_sales
+JOIN dim_seller
+ON fct_seller_sales.seller_id = dim_seller.seller_id
+WHERE sale_date LIKE "2024-04%"
+)
+SELECT *
+FROM cte
+WHERE ranked_by_sale = 1
+
+/*markdown
+###### Within May 2024, for each seller ID, please generate a weekly summary that reports the total number of sales transactions and shows the fee amount from the most recent sale in that week. This analysis will let us correlate fee changes with weekly seller performance trends.
+*/
+
+WITH weekly_sales AS (
+  SELECT sale_id, sale_amount, fee_amount_percentage, seller_id,
+    strftime('%W', sale_date) AS week,
+    ROW_NUMBER() OVER
+      (PARTITION BY strftime('%W',sale_date), seller_id ORDER BY sale_date DESC) AS rownum
+    FROM fct_seller_sales
+    WHERE sale_date LIKE '2024-05%'
+ ORDER BY week ASC
+)
+SELECT week, ws.seller_id, seller_name, COUNT(*) AS sales_per_week,
+  MAX(CASE WHEN rownum = 1 THEN fee_amount_percentage END) AS recent_fee_amount_percentage
+FROM weekly_sales ws
+JOIN dim_seller ds
+ON ws.seller_id = ds.seller_id
+GROUP BY 1,2
+
+/*markdown
+This one was really tricky and I needed a lot of help with it. Specifically, I needed assistance with the window function in the CTE and the CASE function in the main query. More practice!
+*/
+
+/*markdown
+###### Using June 2024, for each seller, create a daily report that computes a cumulative count of transactions up to that day.
+
+
+
+*/
+
+SELECT seller_id, sale_date, COUNT(*) OVER (PARTITION BY seller_id ORDER BY sale_date)
+FROM fct_seller_sales
+WHERE sale_date LIKE '2024-06%'
+
+/*markdown
+The takeaway:
+Part three was MUCH easier than part two, or even part one, haha. The main thing is that I'm getting practice with window functions and how I can use them to effect change.
+*/
+
+/*markdown
+#### Google Pay Digital Wallet Transaction Security Patterns
+*/
+
+/*markdown
+
+##### You are a Product Analyst on the Google Pay security team focused on improving the reliability of digital payments. Your team needs to analyze transaction success and failure rates across various merchant categories to identify potential friction points in payment experiences. By understanding these patterns, you aim to guide product improvements for a smoother and more reliable payment process.
+*/
+
+/*markdown
 ###### For January 2024, what are the total counts of successful and failed transactions in each merchant category? This analysis will help the Google Pay security team identify potential friction points in payment processing.
-
-
 */
 
 SELECT merchant_category, transaction_status, COUNT(transaction_status) AS transaction_status_count
@@ -156,17 +296,15 @@ The takeaway
 */
 
 /*markdown
-##### Photo Sharing Platform User Engagement Metrics
+#### Photo Sharing Platform User Engagement Metrics
 */
 
 /*markdown
-###### As a Product Analyst on the Facebook Photos team, you are tasked with understanding user engagement with the photo sharing feature across different age and geographic segments. Your team is particularly interested in how users under 18 or over 50, as well as international users, are utilizing these features. The insights will guide your team in tailoring product strategies and enhancements to boost engagement among these key user segments.
+##### As a Product Analyst on the Facebook Photos team, you are tasked with understanding user engagement with the photo sharing feature across different age and geographic segments. Your team is particularly interested in how users under 18 or over 50, as well as international users, are utilizing these features. The insights will guide your team in tailoring product strategies and enhancements to boost engagement among these key user segments.
+*/
 
-###### Question 1 of 3
-
+/*markdown
 ###### How many photos were shared by users who are either under 18 years old or over 50 years old during July 2024? This metric will help us understand if these age segments are engaging with the photo sharing feature.
-
-
 */
 
 SELECT COUNT(photo_id)
@@ -178,9 +316,6 @@ AND shared_date LIKE "2024-07%"
 
 /*markdown
 ###### What are the user IDs and the total number of photos shared by users who are not from the United States during August 2024? This analysis will help us identify engagement patterns among international users.
-
-
-
 */
 
 SELECT fct_photo_sharing.user_id, COUNT(photo_id)
@@ -206,23 +341,15 @@ This one was testing my ability to use logic to construct complex conditionals f
 */
 
 /*markdown
-##### Pro Content Creator Mac Software Usage Insights
+#### Pro Content Creator Mac Software Usage Insights
 */
 
 /*markdown
-
-###### As a Product Analyst on the Mac software team, you are tasked with understanding user engagement with multimedia tools. Your team aims to identify key usage patterns and determine how much time users spend on these tools. The end goal is to use these insights to enhance product features and improve user experience.
-*/
-
-/*markdown
-###### Question 1 of 3
+##### As a Product Analyst on the Mac software team, you are tasked with understanding user engagement with multimedia tools. Your team aims to identify key usage patterns and determine how much time users spend on these tools. The end goal is to use these insights to enhance product features and improve user experience.
 */
 
 /*markdown
 ###### As a Product Analyst on the Mac software team, you need to understand the engagement of professional content creators with multimedia tools. What is the number of distinct users on the last day in July 2024?
-*/
-
-
 */
 
 SELECT COUNT(DISTINCT user_id) FROM fct_multimedia_usage
@@ -230,20 +357,14 @@ WHERE usage_date = "2024-07-31"
 
 /*markdown
 ###### As a Product Analyst on the Mac software team, you are assessing how much time professional content creators spend using multimedia tools. What is the average number of hours spent by users during August 2024? Round the result up to the nearest whole number.
-
-
 */
 
  SELECT CEIL(AVG(hours_spent))
 FROM fct_multimedia_usage
 WHERE usage_date LIKE "2024-08%"
 
-
 /*markdown
 ######  As a Product Analyst on the Mac software team, you are investigating exceptional daily usage patterns in September 2024. For each day, determine the distinct user count and the total hours spent using multimedia tools. Which days have both metrics above the respective average daily values for September 2024?
-
-
-
 */
 
 WITH daily_metrics AS (
@@ -270,17 +391,16 @@ I didn't know you could call one cte in another cte, that's wild. It was really 
 */
 
 /*markdown
-##### Reorder Patterns for Amazon Fresh
+#### Reorder Patterns for Amazon Fresh
 */
 
 /*markdown
-###### As a Data Analyst on the Amazon Fresh product team, you and your team are focused on enhancing the customer experience by streamlining the process for customers to reorder their favorite grocery items. Your goal is to identify the most frequently reordered product categories, understand customer preferences for these products, and calculate the average reorder frequency across categories. By analyzing these metrics, you aim to provide actionable insights that will inform strategies to improve customer satisfaction and retention.
+##### As a Data Analyst on the Amazon Fresh product team, you and your team are focused on enhancing the customer experience by streamlining the process for customers to reorder their favorite grocery items. Your goal is to identify the most frequently reordered product categories, understand customer preferences for these products, and calculate the average reorder frequency across categories. By analyzing these metrics, you aim to provide actionable insights that will inform strategies to improve customer satisfaction and retention.
 
-Question 1 of 3
+*/
 
-The product team wants to analyze the most frequently reordered product categories. Can you provide a list of the product category codes (using first 3 letters of product code) and their reorder counts for Q4 2024?
-
-
+/*markdown
+###### The product team wants to analyze the most frequently reordered product categories. Can you provide a list of the product category codes (using first 3 letters of product code) and their reorder counts for Q4 2024?
 */
 
 SELECT SUBSTR(product_code, 1, 3) AS product_category_code,
@@ -294,9 +414,6 @@ WHERE order_date BETWEEN "2024-10-01" AND "2024-12-31"
 
 /*markdown
 ###### To better understand customer preferences, the team needs to know the details of customers who reorder specific products. Can you retrieve the customer information along with their reordered product code(s) for Q4 2024?
-
-
-
 */
 
 SELECT o.customer_id, customer_name, product_code, count(order_id)
@@ -311,9 +428,6 @@ GROUP BY 1,2,3
 
 /*markdown
 ###### When calculating the average reorder frequency, it's important to handle cases where reorder counts may be missing or zero. Can you compute the average reorder frequency across the product categories, ensuring that any missing or null values are appropriately managed for Q4 2024?
-
-
-
 */
 
 WITH cte AS (
@@ -342,18 +456,15 @@ The thing that stuck me was that I needed to add coalesce to the final query. I 
 */
 
 /*markdown
-##### Device Integration with Amazon Services
-
+#### Device Integration with Amazon Services
 */
 
 /*markdown
-###### As a Data Analyst on the Amazon Devices team, you are tasked with evaluating the usage patterns of Amazon services on devices like Echo, Fire TV, and Kindle. Your goal is to categorize device usage, assess overall engagement levels, and analyze the contribution of Prime Video and Amazon Music to total usage. This analysis will inform strategies to optimize service offerings and improve customer satisfaction.
+##### As a Data Analyst on the Amazon Devices team, you are tasked with evaluating the usage patterns of Amazon services on devices like Echo, Fire TV, and Kindle. Your goal is to categorize device usage, assess overall engagement levels, and analyze the contribution of Prime Video and Amazon Music to total usage. This analysis will inform strategies to optimize service offerings and improve customer satisfaction.
+*/
 
-Question 1 of 3
-
-The team wants to identify the total usage duration of the services for each device type by extracting the primary device category from the device name for the period from July 1, 2024 to September 30, 2024. The primary device category is derived from the first word of the device name.
-
-
+/*markdown
+###### The team wants to identify the total usage duration of the services for each device type by extracting the primary device category from the device name for the period from July 1, 2024 to September 30, 2024. The primary device category is derived from the first word of the device name.
 */
 
 SELECT SUBSTR(device_name, 1, (INSTR(device_name, " ") - 1)) AS device_type,
@@ -380,8 +491,6 @@ GROUP BY 1;
 
 /*markdown
 ###### The team is considering bundling the Prime Video and Amazon Music subscription. They want to understand what percentage of total usage time comes from Prime Video and Amazon Music services respectively. Please use data from July 1, 2024 to September 30, 2024.
-
-
 */
 
 WITH cte AS (
@@ -407,23 +516,10 @@ This one was pretty complicated, as it required crafting substrings and searchin
 */
 
 /*markdown
-##### Engagement with Facebook Events
-
+#### Engagement with Facebook Events
 */
 
-/*markdown
-###### As a Data Scientist on the Facebook Events Discovery team, you are tasked with analyzing user interaction with event recommendations to enhance the relevance of these suggestions. Your goal is to identify which event categories receive the most user clicks, determine if users are engaging with events in their preferred categories, and understand user engagement patterns by analyzing click data. This analysis will help optimize recommendation algorithms to increase user satisfaction and event attendance.
-
-Question 1 of 3
-
-
-*/
-
-/*markdown
-###### How many times did users click on event recommendations for each event category in March 2024? Show the category name and the total clicks.
-
-
-*/
+##### As a Data Scientist on the Facebook Events Discovery team, you are tasked with analyzing user interaction with event recommendations to enhance the relevance of these suggestions. Your goal is to identify which event categories receive the most user clicks, determine if users are engaging with events in their preferred categories, and understand user engagement patterns by analyzing click data. This analysis will help optimize recommendation algorithms to increase user satisfaction and event attendance.
 
 SELECT category_name, COUNT(click_id)
 FROM fct_event_clicks c
@@ -435,8 +531,6 @@ GROUP BY 1
 
 /*markdown
 ###### For event clicks in March 2024, identify whether each user clicked on an event in their preferred category. Return the user ID, event category, and a label indicating if it was a preferred category ('Yes' or 'No').
-
-
 */
 
 SELECT u.user_id, category_name,
@@ -453,8 +547,6 @@ WHERE c.click_date LIKE "2024-03%"
 
 /*markdown
 ###### Generate a report that combines the user ID, their full name (first and last name), and the total clicks for events they interacted with in March 2024. Sort the report by user ID in ascending order.
-
-
 */
 
 SELECT dim_users.user_id, CONCAT(first_name, " ", last_name), COUNT(click_id)
@@ -470,18 +562,16 @@ This one felt pretty easy, I think because it mostly focused on my ability to jo
 */
 
 /*markdown
-##### App Download Conversion Rates by Category
-
+#### App Download Conversion Rates by Category
 */
 
 /*markdown
-
-###### You are on the Google Play store's App Marketplace team. You and your team want to understand how different app categories convert from browsing to actual downloads. This analysis is critical in informing future product placement and marketing strategies for app developers and users.
+##### You are on the Google Play store's App Marketplace team. You and your team want to understand how different app categories convert from browsing to actual downloads. This analysis is critical in informing future product placement and marketing strategies for app developers and users.
 */
 
-Question 1 of 3
-
-The marketplace team wants to identify high and low performing app categories. Provide the total downloads for the app categories for November 2024. If there were no downloads for that category, return the value as 0.
+/*markdown
+###### The marketplace team wants to identify high and low performing app categories. Provide the total downloads for the app categories for November 2024. If there were no downloads for that category, return the value as 0.
+*/
 
 WITH cte AS (SELECT app_id, SUM(download_count) AS app_downloads
 FROM fct_app_downloads
@@ -494,9 +584,11 @@ ON a.app_id = cte.app_id
 GROUP BY 1
 ORDER BY 2 DESC;
 
--- I initially ran this as a straightforward LEFT JOIN, thinking that would catch all the category names.
--- But the date filter was eliminating categories that should have been included, so I used a CTE
--- to prefilter the values and joined to that instead, with success!
+/*markdown
+I initially ran this as a straightforward LEFT JOIN, thinking that would catch all the category names.
+But the date filter was eliminating categories that should have been included, so I used a CTE
+to prefilter the values and joined to that instead, with success!
+*/
 
 /*markdown
 ###### Our team's goal is download conversion rate -- defined as downloads per browse event. For each app category, calculate the download conversion rate in December, removing categories where browsing counts are be zero.
@@ -523,9 +615,9 @@ ON a.app_id = cte2.app_id
 GROUP BY 1
 HAVING SUM(total_browse_count) > 0;
 
--- I first thought that I would need two CTEs but I tried doing it first with no CTE and then with one CTE,
--- but filtering download and download date and browse and browse date couldn't happen in the same functions.
--- I also got stuck on where to filter out the aggregate of the browse count when it was 0
+/*markdown
+I first thought that I would need two CTEs but I tried doing it first with no CTE and then with one CTE, but filtering download and download date and browse and browse date couldn't happen in the same functions. I also got stuck on where to filter out the aggregate of the browse count when it was 0
+*/
 
 /*markdown
 ###### The team wants to compare conversion rates between free and premium apps across all categories. Combine the conversion data for both app types to present a unified view for Q4 2024.
@@ -552,8 +644,9 @@ ON a.app_id = cte2.app_id
 GROUP BY category, app_type
 HAVING SUM(total_browse_count) > 0
 
--- This was very easy, all I had to do was include app_type in both the select and group by sections
--- and update the date to include all of Q4
+/*markdown
+This was very easy, all I had to do was include app_type in both the select and group by sections and update the date to include all of Q4
+*/
 
 /*markdown
 Takeaway: It's important to remember that it's unwise to apply filters on multiple aggregates at a time. It introduces the risk that your filter for one aggregate will falsify the other and vice versa. Multiple CTEs were necessary this time to ensure that was successful.
@@ -568,14 +661,14 @@ Takeaway: It's important to remember that it's unwise to apply filters on multip
 */
 
 /*markdown
+
 ###### 3-Topping Pizzas
+*/
 
+/*markdown
 You’re a consultant for a major pizza chain that will be running a promotion where all 3-topping pizzas will be sold for a fixed price, and are trying to understand the costs involved.
-
 Given a list of pizza toppings, consider all the possible 3-topping pizzas, and print out the total cost of those 3 toppings. Sort the results with the highest total cost on the top followed by pizza toppings in ascending order.
-
 Break ties by listing the ingredients in alphabetical order, starting from the first ingredient, followed by the second and third.
-
 
 
 */
