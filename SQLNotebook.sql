@@ -29,6 +29,22 @@ The takeaway
 */
 
 /*markdown
+##### Unpivoting
+*/
+
+SELECT dimension, 'metric_name_x' AS metric, SUM(metric_x_count)
+FROM table
+UNION ALL
+SELECT dimension, 'metric_name_y' AS metric, SUM(metric_y_count)
+FROM table
+
+/*markdown
+Unpivoting involves making a two columns, one that contains the metric name, and another that contains the aggregate of that metric. By taking UNION ALL of that table and another, you get a single set of columns that contain the metric name and the aggregate of the metric instead of an individual column for each metric.
+Pivoting is when you make multiple columns for each dimension or metric, so it makes sense that unpivoting is making a single column from multiple.
+See [example](#your-product-manager-requests-a-report-that-shows-impressions-likes-comments-and-shares-for-each-content-type-between-april-8-and-21-2024-she-specifically-requests-that-engagement-metrics-are-unpivoted-into-a-single-metric-type-column)
+*/
+
+/*markdown
 ##### Extract single value using MAX(CASE)
 */
 
@@ -111,6 +127,135 @@ FROMX table;
 
 /*markdown
 ### Interview Master
+*/
+
+/*markdown
+#### Creators Growth: Engagement and Follower Metrics
+
+*/
+
+/*markdown
+##### You are a Data Analyst on the Creator Growth team at Meta, focused on evaluating how different content types influence creator success. Your team aims to determine which content types most effectively drive engagement and follower growth for creators. The ultimate goal is to provide creators with actionable insights to optimize their content strategies for maximum audience expansion.
+
+
+*/
+
+/*markdown
+###### For content published in May 2024, which creator IDs show the highest new follower growth within each content type? If a creator published multiple of the same content type, we want to look at the total new follower growth from that content type.
+
+
+
+*/
+
+WITH growth AS (
+SELECT content_type, creator_id, SUM(new_followers_count) AS total_follower_growth,
+  ROW_NUMBER() OVER (PARTITION BY content_type ORDER BY SUM(new_followers_count) DESC) AS rownum
+FROM fct_creator_content
+WHERE published_date LIKE '2024-05%'
+GROUP BY 1, 2
+  )
+SELECT * FROM growth WHERE rownum = 1
+
+/*markdown
+###### Your Product Manager requests a report that shows impressions, likes, comments, and shares for each content type between April 8 and 21, 2024. She specifically requests that engagement metrics are unpivoted into a single 'metric type' column.
+
+
+
+*/
+
+SELECT content_type, 'impressions' AS metric, SUM(impressions_count) AS total
+FROM fct_creator_content
+WHERE published_date BETWEEN '2024-04-08' AND '2024-04-21'
+GROUP BY 1
+UNION ALL
+SELECT content_type, 'likes' AS metric, SUM(likes_count) AS total
+FROM fct_creator_content
+WHERE published_date BETWEEN '2024-04-08' AND '2024-04-21'
+GROUP BY 1
+UNION ALL
+SELECT content_type, 'comments' AS metric, SUM(comments_count) AS total
+FROM fct_creator_content
+WHERE published_date BETWEEN '2024-04-08' AND '2024-04-21'
+GROUP BY 1
+UNION ALL
+SELECT content_type, 'shares' AS metric, SUM(shares_count) AS total
+FROM fct_creator_content
+WHERE published_date BETWEEN '2024-04-08' AND '2024-04-21'
+GROUP BY 1
+
+-- This is my first time ever "unpivoting"
+
+/*markdown
+###### For content published between April and June 2024, can you calculate for each creator, what % of their new followers came from each content type?
+
+
+
+*/
+
+SELECT content_type, creator_id,
+  SUM(new_followers_count) / SUM(new_followers_count) OVER (PARTITION BY creator_id) * 100
+FROM fct_creator_content
+WHERE published_date BETWEEN '2024-04-01' AND '2024-06-31'
+  GROUP BY 2, 1
+
+/*markdown
+The major learning here was definitely problem 2, which required me to unpivot something. <br>
+The last problem was interesting in that I used a window function to get help me get the proportion of a value across a dimension. 
+*/
+
+/*markdown
+#### Corporate Social Responsibility Community Program Impact
+*/
+
+/*markdown
+##### As a Data Analyst on Apple's Corporate Social Responsibility team, you are tasked with evaluating the effectiveness of recent philanthropic initiatives. Your focus is on understanding participant engagement across different communities and programs. The insights you gather will guide strategic decisions for resource allocation and future program expansions.
+
+
+*/
+
+/*markdown
+###### Apple's Corporate Social Responsibility team wants a summary report of philanthropic initiatives in January 2024. Please compile a report that aggregates participant numbers by community and by program.
+
+
+*/
+
+SELECT community_name, program_name, SUM(participants) AS total_participants
+FROM fct_philanthropic_initiatives i
+JOIN dim_community c
+ON c.community_id = i.community_id
+  WHERE event_date LIKE '2024-01%'
+GROUP BY 1, 2
+
+/*markdown
+###### The team is reviewing the execution of February 2024 philanthropic programs. For each initiative, provide details along with the earliest event date recorded within each program campaign to understand start timings.
+
+
+
+*/
+
+SELECT program_name, community_name, i.community_id, region, MIN(event_date)
+FROM fct_philanthropic_initiatives i
+JOIN dim_community c
+ON c.community_id = i.community_id
+WHERE event_date LIKE '2024-02%'
+GROUP BY 1, 2, 3, 4
+
+/*markdown
+###### For a refined analysis of initiatives held during the first week of March 2024, include for each program the maximum participation count recorded in any event. This information will help highlight the highest engagement levels within each campaign.
+
+
+
+*/
+
+SELECT program_name, MAX(participants)
+FROM fct_philanthropic_initiatives i
+JOIN dim_community c
+ON c.community_id = i.community_id
+WHERE event_date BETWEEN '2024-03-01' AND '2024-03-07'
+GROUP BY 1
+
+/*markdown
+This problem set felt really easy all across the board. Like, besides interpreting what data to include when it asked for "details," I really didn't struggle with any part of the work. Identifying the maxes and mins was probably what this was testing.
 */
 
 /*markdown
