@@ -130,6 +130,80 @@ FROMX table;
 */
 
 /*markdown
+#### Phone Partnership Subscriber Retention Metrics
+
+*/
+
+/*markdown
+##### You are a Data Analyst in the Partnerships & Bundling team at a telecom company. Your team is investigating the impact of different telecom partners on Netflix subscriber conversion, retention, and engagement for phone plan bundles. The goal is to identify which partners drive the most conversions, longest retention, and highest engagement to inform future partnership strategies and pricing models.
+
+
+*/
+
+/*markdown
+###### For subscribers who converted in January 2024, give us the name of the Telecom partner that led to acquiring the most new subscribers?
+
+
+*/
+
+SELECT partner_name, COUNT(subscriber_id) AS subscriber_count
+FROM fct_bundle_subscriptions s
+  JOIN dim_telecom_partners p
+  ON p.partner_id = s.partner_id
+WHERE conversion_date LIKE '2024-01%'
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 1
+
+/*markdown
+###### For each telecom partner, what is the longest number of days that a subscriber remained active after conversion and which bundle(s) did they subscribe on? For this analysis, only look at conversions between October 8th, 2024 and October 14th, 2024. If there are multiple bundles resulting in the same highest retention, return all the bundles.
+
+
+
+*/
+
+WITH ranked AS (
+  SELECT partner_name, bundle_id, retention_days,
+   RANK() OVER (PARTITION BY partner_name ORDER BY retention_days DESC) AS ranknum
+  FROM fct_bundle_subscriptions s
+  JOIN dim_telecom_partners p
+  ON p.partner_id = s.partner_id
+  WHERE conversion_date BETWEEN '2024-10-08' AND '2024-10-14'
+    )
+SELECT partner_name, bundle_id, retention_days FROM ranked WHERE ranknum = 1
+
+/*markdown
+###### For subscribers who converted in November 2024, what is the average engagement score for each bundle within each telecom partner. How does each bundle’s average engagement score compare to the all-time highest engagement score recorded by its respective telecom partner expressed as a percentage of that maximum?
+
+
+
+*/
+
+WITH max_all_dates AS (
+  SELECT partner_name, MAX(engagement_score) AS max_engagement_score
+FROM fct_bundle_subscriptions s
+  JOIN dim_telecom_partners p
+  ON p.partner_id = s.partner_id
+  GROUP BY 1
+), agg_values AS (
+  SELECT partner_name, bundle_id, AVG(engagement_score) AS avg_engagement_score
+  FROM fct_bundle_subscriptions s
+  JOIN dim_telecom_partners p
+  ON p.partner_id = s.partner_id
+WHERE conversion_date LIKE '2024-11%'
+GROUP BY 1, 2
+)
+SELECT m.partner_name, bundle_id, avg_engagement_score, max_engagement_score,
+  ROUND(avg_engagement_score / max_engagement_score * 100,1) AS percent_engagment_score
+FROM agg_values v
+LEFT JOIN max_all_dates m
+ON m.partner_name = v.partner_name
+
+/*markdown
+This one wasn't too hard, though it tried to get a little tricky with the different selection criteria in the last problem.
+*/
+
+/*markdown
 #### Creators Growth: Engagement and Follower Metrics
 
 */
