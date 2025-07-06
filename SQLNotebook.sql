@@ -158,10 +158,76 @@ FROMX table;
 */
 
 /*markdown
-#### Google Ads Campaign Performance Optimization <br>
-You are a Data Analyst on the Google Ads Performance team working to optimize ad campaign strategies. The goal is to assess the diversity of ad formats, identify high-reach campaigns, and evaluate the return on investment across different campaign segments. Your team will use these insights to make strategic budget allocations and targeting adjustments for future campaigns. <br> For each ad campaign segment, what are the unique ad formats used during July 2024? This will help us understand the diversity in our ad formats.
+#### Google Play Developer Monetization and Distribution Performance
+
+*/
 
 
+
+/*markdown
+##### You are a Data Analyst on the Google Play Developer Ecosystem team. Your team is focused on understanding how different app categories and monetization models influence developer revenue and app distribution. The goal is to provide strategic insights to optimize developer monetization strategies and enhance platform engagement.
+
+
+*/
+
+
+
+/*markdown
+###### For the month of April 2024, which app categories generated the highest total revenue (top 10 only)? This insight will be used to refine monetization strategies for developers.
+
+
+*/
+
+SELECT category_name, SUM(revenue_amount) AS revenue_sum
+  FROM fct_app_revenue r
+  JOIN dim_app_category c
+  ON r.category_id = c.category_id
+WHERE revenue_date LIKE '2024-04%'
+  GROUP BY 1
+  ORDER BY 2 DESC
+LIMIT 10
+
+/*markdown
+###### During the second quarter of 2024, how does the weekly revenue ranking of each app category change? The team will use this analysis to identify performance trends and adjust engagement efforts.
+
+
+
+*/
+
+WITH weekly_rev AS (
+  SELECT category_name, STRFTIME('%W',revenue_date) AS week,
+  SUM(revenue_amount) AS weekly_rev_sum
+FROM fct_app_revenue r
+  JOIN dim_app_category c
+  ON r.category_id = c.category_id
+WHERE revenue_date BETWEEN '2024-04-01' AND '2024-06-30'
+GROUP BY 1, 2
+)
+SELECT *,
+  RANK() OVER
+  (PARTITION BY week ORDER BY weekly_rev_sum DESC) AS weekly_rank
+FROM weekly_rev
+
+/*markdown
+###### For apps using a subscription monetization model, can you give us the running total revenue by app for every day in April 2024? We are investigating a complaint from app developers about a slowdown in revenue in that month.
+
+
+
+
+*/
+
+SELECT r.app_id, revenue_date, SUM(revenue_amount) OVER (PARTITION BY r.app_id ORDER BY revenue_date ASC)
+FROM fct_app_revenue r
+  JOIN dim_monetization_model m
+ON r.app_id = m.app_id  
+WHERE revenue_date LIKE '2024-04%' AND monetization_type = 'subscription'
+
+/*markdown
+Lots of good practice using window functions in these questions
+*/
+
+/*markdown
+#### Google Ads Campaign Performance Optimization <br> You are a Data Analyst on the Google Ads Performance team working to optimize ad campaign strategies. The goal is to assess the diversity of ad formats, identify high-reach campaigns, and evaluate the return on investment across different campaign segments. Your team will use these insights to make strategic budget allocations and targeting adjustments for future campaigns. <br> For each ad campaign segment, what are the unique ad formats used during July 2024? This will help us understand the diversity in our ad formats.
 
 
 
