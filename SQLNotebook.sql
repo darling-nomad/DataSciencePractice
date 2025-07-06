@@ -1,8 +1,8 @@
 /*markdown
 # SQL Practice Notebook
 #### Table of Contents
-**[Notes](#notes)** <br>
-**[Interview Master →](#interview-master)** <br>
+**[Notes](#notes)** 
+**[Interview Master →](#interview-master)** 
 **[HackerRank →](#hackerrank)**
 */
 
@@ -26,6 +26,34 @@ The takeaway
 
 /*markdown
 ### Notes
+*/
+
+/*markdown
+##### Correlated Subquery
+*/
+
+SELECT dimension_x, dimension_y, metric
+FROM table t1
+WHERE metric > (SELECT AVG(metric) FROM table t2 WHERE t1.dimension_x = t2.dimension_x) 
+
+/*markdown
+__[Correlated subqueries](https://www.sqltutorial.org/sql-correlated-subquery/)__ are when you make a subquery that depends on the outerquery for its input values. The subquery executes once for each row in the outer query. In the query above, each row will be compared to an average in the inner query. Any values that exceed the average will be included. The inner query's where statement is what determines what criterion will be compared. For example, if the inner query had "WHERE t1.use_date = t2.use_date, it would compare the value in the outer query to an average of values with the same date. "WHERE t1.publisher_tier = t2.publisher_tier" would filter for values that exceed the average for the same publisher tier.
+*/
+
+/*markdown
+##### Unpivoting
+*/
+
+SELECT dimension, 'metric_name_x' AS metric, SUM(metric_x_count)
+FROM table
+UNION ALL
+SELECT dimension, 'metric_name_y' AS metric, SUM(metric_y_count)
+FROM table
+
+/*markdown
+Unpivoting involves making a two columns, one that contains the metric name, and another that contains the aggregate of that metric. By taking UNION ALL of that table and another, you get a single set of columns that contain the metric name and the aggregate of the metric instead of an individual column for each metric.
+Pivoting is when you make multiple columns for each dimension or metric, so it makes sense that unpivoting is making a single column from multiple.
+See [example](#your-product-manager-requests-a-report-that-shows-impressions-likes-comments-and-shares-for-each-content-type-between-april-8-and-21-2024-she-specifically-requests-that-engagement-metrics-are-unpivoted-into-a-single-metric-type-column)
 */
 
 /*markdown
@@ -71,9 +99,9 @@ END AS case_name
 FROM table
 
 /*markdown
-Case is used like an if then in SQL <br>
-It can bucket values into categories <br>
-It can replace values or clean data <br>
+Case is used like an if then in SQL 
+It can bucket values into categories 
+It can replace values or clean data 
 It can also be used to take inputs like 0, 1 and return True/False, or "yes"/"no" or vice versa.
 */
 
@@ -130,20 +158,70 @@ FROMX table;
 */
 
 /*markdown
-#### Phone Partnership Subscriber Retention Metrics
+#### Google Ads Campaign Performance Optimization <br>
+You are a Data Analyst on the Google Ads Performance team working to optimize ad campaign strategies. The goal is to assess the diversity of ad formats, identify high-reach campaigns, and evaluate the return on investment across different campaign segments. Your team will use these insights to make strategic budget allocations and targeting adjustments for future campaigns. <br> For each ad campaign segment, what are the unique ad formats used during July 2024? This will help us understand the diversity in our ad formats.
+
+
+
+
+
 
 */
 
+SELECT DISTINCT ad_format, segment
+FROM fct_ad_performance p 
+JOIN dim_campaign c
+ON p.campaign_id = c.campaign_id
+WHERE campaign_date LIKE '2024-07%'
+GROUP BY 2
+
 /*markdown
-##### You are a Data Analyst in the Partnerships & Bundling team at a telecom company. Your team is investigating the impact of different telecom partners on Netflix subscriber conversion, retention, and engagement for phone plan bundles. The goal is to identify which partners drive the most conversions, longest retention, and highest engagement to inform future partnership strategies and pricing models.
+###### How many unique campaigns had at least one rolling 7-day period in August 2024 where their total impressions exceeded 1,000? We want to identify campaigns that had a high reach in at least one 7-day window during this month.
+
 
 
 */
 
+WITH rolling AS (
+   SELECT campaign_id, campaign_date, SUM(impressions) OVER 
+   (PARTITION BY campaign_id
+   ORDER BY campaign_date ROWS BETWEEN 7 PRECEDING AND CURRENT ROW) AS rolling_sum
+FROM fct_ad_performance
+)
+SELECT COUNT(DISTINCT campaign_id) FROM rolling
+WHERE rolling_sum > 1000 AND campaign_date LIKE '2024-08%'
+
 /*markdown
+What is the total ROI for each campaign segment in Q3 2024? And, how does it compare to the average ROI of all campaigns (return labels 'higher than average' or 'lower than average')? We will use this to identify which segments are outperforming the average.
+Note 1: ROI is defined as (revenue - cost) / cost.
+Note 2: For average ROI across segment, calculate the ROI per segment and then calculate the average ROI across segments.
+
+
+
+*/
+
+WITH roi_table AS (
+SELECT segment, ((SUM(revenue) - SUM(cost)) / SUM(cost)) AS roi
+FROM fct_ad_performance
+JOIN dim_campaign
+ON fct_ad_performance.campaign_id = dim_campaign.campaign_id
+WHERE campaign_date BETWEEN '2024-07-01' AND '2024-09-30'
+  GROUP BY 1
+)
+SELECT segment, roi, AVG(roi) OVER () AS avg_roi,
+  CASE WHEN roi > AVG(roi) OVER () THEN 'higher than average'
+  ELSE 'lower than average' END AS roi_comparison
+  FROM roi_table
+GROUP BY 1
+
+/*markdown
+This one had an interesting new learning for me, [frame specifications](https://www.sqlite.org/syntax/frame-spec.html). I was able to specify which rows in the window function I wanted to roll over. That's WILD. It also only works if there are no date values missing or anything like that. If there was one missing, the values would come incorrectly.
+*/
+
+/*markdown
+#### Phone Partnership Subscriber Retention Metrics 
+##### You are a Data Analyst in the Partnerships & Bundling team at a telecom company. Your team is investigating the impact of different telecom partners on Netflix subscriber conversion, retention, and engagement for phone plan bundles. The goal is to identify which partners drive the most conversions, longest retention, and highest engagement to inform future partnership strategies and pricing models. 
 ###### For subscribers who converted in January 2024, give us the name of the Telecom partner that led to acquiring the most new subscribers?
-
-
 */
 
 SELECT partner_name, COUNT(subscriber_id) AS subscriber_count
@@ -157,9 +235,6 @@ LIMIT 1
 
 /*markdown
 ###### For each telecom partner, what is the longest number of days that a subscriber remained active after conversion and which bundle(s) did they subscribe on? For this analysis, only look at conversions between October 8th, 2024 and October 14th, 2024. If there are multiple bundles resulting in the same highest retention, return all the bundles.
-
-
-
 */
 
 WITH ranked AS (
@@ -174,9 +249,6 @@ SELECT partner_name, bundle_id, retention_days FROM ranked WHERE ranknum = 1
 
 /*markdown
 ###### For subscribers who converted in November 2024, what is the average engagement score for each bundle within each telecom partner. How does each bundle’s average engagement score compare to the all-time highest engagement score recorded by its respective telecom partner expressed as a percentage of that maximum?
-
-
-
 */
 
 WITH max_all_dates AS (
@@ -210,12 +282,15 @@ This one wasn't too hard, though it tried to get a little tricky with the differ
 
 /*markdown
 ##### You are a Data Analyst on the Creator Growth team at Meta, focused on evaluating how different content types influence creator success. Your team aims to determine which content types most effectively drive engagement and follower growth for creators. The ultimate goal is to provide creators with actionable insights to optimize their content strategies for maximum audience expansion.
+*/
 
+/*markdown
 
 */
 
 /*markdown
 ###### For content published in May 2024, which creator IDs show the highest new follower growth within each content type? If a creator published multiple of the same content type, we want to look at the total new follower growth from that content type.
+*/
 
 
 
@@ -231,8 +306,8 @@ GROUP BY 1, 2
 SELECT * FROM growth WHERE rownum = 1
 
 /*markdown
-###### Your Product Manager requests a report that shows impressions, likes, comments, and shares for each content type between April 8 and 21, 2024. She specifically requests that engagement metrics are unpivoted into a single 'metric type' column.
 
+###### Your Product Manager requests a report that shows impressions, likes, comments, and shares for each content type between April 8 and 21, 2024. She specifically requests that engagement metrics are unpivoted into a single 'metric type' column.
 
 
 */
@@ -257,11 +332,13 @@ FROM fct_creator_content
 WHERE published_date BETWEEN '2024-04-08' AND '2024-04-21'
 GROUP BY 1
 
+/*markdown
 -- This is my first time ever "unpivoting"
+*/
 
 /*markdown
-###### For content published between April and June 2024, can you calculate for each creator, what % of their new followers came from each content type?
 
+###### For content published between April and June 2024, can you calculate for each creator, what % of their new followers came from each content type?
 
 
 */
@@ -273,7 +350,7 @@ WHERE published_date BETWEEN '2024-04-01' AND '2024-06-31'
   GROUP BY 2, 1
 
 /*markdown
-The major learning here was definitely problem 2, which required me to unpivot something. <br>
+The major learning here was definitely problem 2, which required me to unpivot something. 
 The last problem was interesting in that I used a window function to get help me get the proportion of a value across a dimension. 
 */
 
@@ -282,15 +359,13 @@ The last problem was interesting in that I used a window function to get help me
 */
 
 /*markdown
+
 ##### As a Data Analyst on Apple's Corporate Social Responsibility team, you are tasked with evaluating the effectiveness of recent philanthropic initiatives. Your focus is on understanding participant engagement across different communities and programs. The insights you gather will guide strategic decisions for resource allocation and future program expansions.
-
-
 */
 
 /*markdown
+
 ###### Apple's Corporate Social Responsibility team wants a summary report of philanthropic initiatives in January 2024. Please compile a report that aggregates participant numbers by community and by program.
-
-
 */
 
 SELECT community_name, program_name, SUM(participants) AS total_participants
@@ -301,8 +376,8 @@ ON c.community_id = i.community_id
 GROUP BY 1, 2
 
 /*markdown
-###### The team is reviewing the execution of February 2024 philanthropic programs. For each initiative, provide details along with the earliest event date recorded within each program campaign to understand start timings.
 
+###### The team is reviewing the execution of February 2024 philanthropic programs. For each initiative, provide details along with the earliest event date recorded within each program campaign to understand start timings.
 
 
 */
@@ -315,8 +390,8 @@ WHERE event_date LIKE '2024-02%'
 GROUP BY 1, 2, 3, 4
 
 /*markdown
-###### For a refined analysis of initiatives held during the first week of March 2024, include for each program the maximum participation count recorded in any event. This information will help highlight the highest engagement levels within each campaign.
 
+###### For a refined analysis of initiatives held during the first week of March 2024, include for each program the maximum participation count recorded in any event. This information will help highlight the highest engagement levels within each campaign.
 
 
 */
@@ -333,14 +408,13 @@ This problem set felt really easy all across the board. Like, besides interpreti
 */
 
 /*markdown
-#### Prime Member Exclusive Product Engagement Metrics
 
+#### Prime Member Exclusive Product Engagement Metrics
 */
 
 /*markdown
+
 ##### As a Data Analyst on the Amazon Prime product analytics team, you are tasked with evaluating Prime member engagement with exclusive promotions. Your team is focused on understanding how members interact with special deals and early product access. The goal is to identify engagement patterns and target highly engaged members to enhance member value and drive higher engagement with these offerings.
-
-
 */
 
 SELECT COUNT(DISTINCT member_id) AS deal_purchasers, COUNT(*) / COUNT(DISTINCT member_id) AS avg_purchases_per_user
@@ -348,8 +422,8 @@ FROM fct_prime_deals
 WHERE purchase_date LIKE '2024-01%'
 
 /*markdown
-###### To gain insights into purchase patterns, what is the distribution of members based on the number of deals purchased in February 2024? Group the members into the following categories: 1-2 deals, 3-5 deals, and more than 5 deals.
 
+###### To gain insights into purchase patterns, what is the distribution of members based on the number of deals purchased in February 2024? Group the members into the following categories: 1-2 deals, 3-5 deals, and more than 5 deals.
 
 
 */
@@ -369,8 +443,8 @@ FROM cte
 GROUP BY 1
 
 /*markdown
-###### To target highly engaged members for tailored promotions, can we identify Prime members who purchased more than 5 exclusive deals between January 1st and March 31st, 2024? How many such members are there and what is their average total spend on these deals?
 
+###### To target highly engaged members for tailored promotions, can we identify Prime members who purchased more than 5 exclusive deals between January 1st and March 31st, 2024? How many such members are there and what is their average total spend on these deals?
 
 
 */
@@ -389,14 +463,13 @@ I initially made this one way harder than it was, trying to use subqueries to fi
 */
 
 /*markdown
-#### Third-Party Seller Fees and Performance Metrics
 
+#### Third-Party Seller Fees and Performance Metrics
 */
 
 /*markdown
+
 ###### For each seller, please identify their top sale transaction in April 2024 based on sale amount. If there are multiple transactions with the same sale amount, select the one with the most recent sale_date.
-
-
 */
 
 WITH cte AS (
@@ -437,8 +510,8 @@ This one was really tricky and I needed a lot of help with it. Specifically, I n
 */
 
 /*markdown
-###### Using June 2024, for each seller, create a daily report that computes a cumulative count of transactions up to that day.
 
+###### Using June 2024, for each seller, create a daily report that computes a cumulative count of transactions up to that day.
 
 
 */
@@ -454,11 +527,13 @@ Part three was MUCH easier than part two, or even part one, haha. The main thing
 
 /*markdown
 #### Google Pay Digital Wallet Transaction Security Patterns
+
+
 */
 
 /*markdown
-
 ##### You are a Product Analyst on the Google Pay security team focused on improving the reliability of digital payments. Your team needs to analyze transaction success and failure rates across various merchant categories to identify potential friction points in payment experiences. By understanding these patterns, you aim to guide product improvements for a smoother and more reliable payment process.
+
 */
 
 /*markdown
@@ -471,8 +546,8 @@ WHERE transaction_date LIKE "2024-01%"
 GROUP BY 1, 2
 
 /*markdown
-###### For the first quarter of 2024, which merchant categories recorded a transaction success rate below 90%? This insight will guide our prioritization of security enhancements to improve payment reliability.
 
+###### For the first quarter of 2024, which merchant categories recorded a transaction success rate below 90%? This insight will guide our prioritization of security enhancements to improve payment reliability.
 */
 
 WITH cte AS (
@@ -493,8 +568,8 @@ SELECT merchant_category, transaction_success_rate
 GROUP BY 1
 
 /*markdown
-###### From January 1st to March 31st, 2024, can you generate a list of merchant categories with their concatenated counts for successful and failed transactions? Then, rank the categories by total transaction volume. This ranking will support our assessment of areas where mixed transaction outcomes may affect user experience.
 
+###### From January 1st to March 31st, 2024, can you generate a list of merchant categories with their concatenated counts for successful and failed transactions? Then, rank the categories by total transaction volume. This ranking will support our assessment of areas where mixed transaction outcomes may affect user experience.
 
 
 */
@@ -613,10 +688,10 @@ I didn't know you could call one cte in another cte, that's wild. It was really 
 #### Reorder Patterns for Amazon Fresh
 */
 
-/*markdown
+
 ##### As a Data Analyst on the Amazon Fresh product team, you and your team are focused on enhancing the customer experience by streamlining the process for customers to reorder their favorite grocery items. Your goal is to identify the most frequently reordered product categories, understand customer preferences for these products, and calculate the average reorder frequency across categories. By analyzing these metrics, you aim to provide actionable insights that will inform strategies to improve customer satisfaction and retention.
 
-*/
+
 
 /*markdown
 ###### The product team wants to analyze the most frequently reordered product categories. Can you provide a list of the product category codes (using first 3 letters of product code) and their reorder counts for Q4 2024?
@@ -879,18 +954,18 @@ Takeaway: It's important to remember that it's unwise to apply filters on multip
 ### Data Lemur
 */
 
-/*markdown
+
 
 ###### 3-Topping Pizzas
-*/
 
-/*markdown
+
+
 You’re a consultant for a major pizza chain that will be running a promotion where all 3-topping pizzas will be sold for a fixed price, and are trying to understand the costs involved.
 Given a list of pizza toppings, consider all the possible 3-topping pizzas, and print out the total cost of those 3 toppings. Sort the results with the highest total cost on the top followed by pizza toppings in ascending order.
 Break ties by listing the ingredients in alphabetical order, starting from the first ingredient, followed by the second and third.
 
 
-*/
+
 
 WITH cte1 AS (SELECT * FROM pizza_toppings),
 cte2 AS (SELECT * FROM pizza_toppings)
@@ -907,6 +982,6 @@ This one was really interesting! I didn't struggle with duplicating the tables r
 
 /*markdown
 ### Jump To
-**[Interview Master →](#interview-master)** <br>
+**[Interview Master →](#interview-master)** 
 **[HackerRank →](#hackerrank)**
 */
