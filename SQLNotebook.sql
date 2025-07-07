@@ -158,6 +158,65 @@ FROMX table;
 */
 
 /*markdown
+#### iPhone Camera Performance Across User Segments
+
+*/
+
+/*markdown
+##### As a Product Analyst on the iPhone Camera team, you are tasked with evaluating camera quality metrics across different user groups. Your team aims to understand variations in photo and video capture performance to identify opportunities for hardware or software improvements. The end goal is to prioritize future camera development efforts based on data-driven insights into user group performance trends.
+
+
+*/
+
+/*markdown
+###### For the month of July 2024, how do average photo capture quality scores vary across different user groups? This analysis will help us identify segments where camera performance improvements could be prioritized.
+
+
+*/
+
+SELECT user_group_name, AVG(photo_quality_score)
+  FROM fct_capture_quality c
+  JOIN dim_user_group g
+  ON c.user_group_id = g.user_group_id
+WHERE capture_date LIKE '2024-07%'
+GROUP BY 1
+
+/*markdown
+###### Between August 1st and August 7th, 2024, how do photo capture quality scores change for each iPhone user group? Use a 3-day average rolling window for this analysis.
+
+
+
+*/
+
+SELECT  user_group_name, capture_date,
+  AVG(photo_quality_score)
+  OVER (PARTITION BY user_group_name ORDER BY capture_date ASC
+  ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)
+  FROM fct_capture_quality c
+  JOIN dim_user_group g
+  ON c.user_group_id = g.user_group_id
+WHERE capture_date BETWEEN '2024-08-01' AND '2024-08-07'
+
+/*markdown
+###### For Q3 2024 (July 1st to September 30th), how do video capture quality scores trend for each iPhone user group when comparing each capture to the subsequent one? This insight will support our approach to optimize video performance through targeted hardware or software improvements.
+
+
+
+*/
+
+SELECT user_group_name, video_quality_score, capture_date,
+   video_quality_score - LEAD(video_quality_score, 1)
+   OVER (PARTITION BY user_group_name ORDER BY capture_date ASC)
+  FROM fct_capture_quality c
+  JOIN dim_user_group g
+  ON c.user_group_id = g.user_group_id
+   WHERE capture_date BETWEEN '2024-07-01' AND '2024-09-30'
+
+/*markdown
+This was some good practice using window functions, one with a frame spec and another using LEAD.
+*/
+
+/*markdown
 #### Google Play Developer Monetization and Distribution Performance
 
 */
@@ -425,13 +484,21 @@ The last problem was interesting in that I used a window function to get help me
 */
 
 /*markdown
-
-##### As a Data Analyst on Apple's Corporate Social Responsibility team, you are tasked with evaluating the effectiveness of recent philanthropic initiatives. Your focus is on understanding participant engagement across different communities and programs. The insights you gather will guide strategic decisions for resource allocation and future program expansions.
+/*markdown
 */
 
 /*markdown
+##### As a Data Analyst on Apple's Corporate Social Responsibility team, you are tasked with evaluating the effectiveness of recent philanthropic initiatives. Your focus is on understanding participant engagement across different communities and programs. The insights you gather will guide strategic decisions for resource allocation and future program expansions.
+*/
+*/
 
+/*markdown
+/*markdown
+*/
+
+/*markdown
 ###### Apple's Corporate Social Responsibility team wants a summary report of philanthropic initiatives in January 2024. Please compile a report that aggregates participant numbers by community and by program.
+*/
 */
 
 SELECT community_name, program_name, SUM(participants) AS total_participants
