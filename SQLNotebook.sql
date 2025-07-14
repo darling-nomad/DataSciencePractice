@@ -29,6 +29,14 @@ The takeaway
 */
 
 /*markdown
+##### Indices
+*/
+
+/*markdown
+
+*/
+
+/*markdown
 ##### Correlated Subquery
 */
 
@@ -155,6 +163,286 @@ FROMX table;
 
 /*markdown
 ### Interview Master
+*/
+
+/*markdown
+#### Stays Host Communication Response Time Impact
+*/
+
+/*markdown
+##### You are a Product Analyst on the Airbnb Stays team focusing on host communication patterns. Your team is exploring how host response times impact guest booking behaviors and overall satisfaction. The aim is to derive insights that can enhance host communication efficiency and improve booking conversion rates.
+*/
+
+/*markdown
+###### What is the average response time for hosts during April 2024, and how does it vary across different property types?
+*/
+
+WITH cte AS (
+SELECT host_id, property_type, AVG(response_time_minutes) AS host_response_avg
+FROM fct_host_communications
+JOIN dim_properties
+ON fct_host_communications. property_id = dim_properties.property_id
+  WHERE communication_date LIKE '2024-04%'
+GROUP BY 1
+  )
+SELECT property_type,
+  host_id, 
+  host_response_avg, 
+  AVG(host_response_avg) OVER (PARTITION BY 
+  property_type) AS host_response_property_type_avg
+  FROM cte GROUP BY property_type, host_id
+
+/*markdown
+###### Identify the top 5 hosts with the fastest average response times in April 2024. How does their response time compare to the overall average response time for that month?
+*/
+
+SELECT host_id, AVG(response_time_minutes), AVG(response_time_minutes) OVER ()
+FROM fct_host_communications
+JOIN dim_properties
+ON fct_host_communications. property_id = dim_properties.property_id
+  WHERE communication_date LIKE '2024-04%'
+  GROUP BY 1
+  ORDER BY 2 ASC
+LIMIT 5
+
+/*markdown
+###### For the second quarter of 2024, calculate the average host response times and booking conversion rates for each property. This will help us understand if a quicker respsonse time leads to a higher booking conversion rate.
+*/
+
+SELECT fct_bookings.property_id, AVG(response_time_minutes), (1.0*SUM(CASE WHEN booking_status = 'confirmed' THEN 1 END)/COUNT(*))
+AS conversion_rate
+FROM fct_host_communications
+  JOIN fct_bookings
+  ON fct_bookings.property_id = fct_host_communications.property_id
+WHERE communication_date BETWEEN '2024-04-01' AND '2024-06-30'
+  AND booking_date BETWEEN '2024-04-01' AND '2024-06-30'
+GROUP BY 1
+
+/*markdown
+This one provided good practice showing both aggregate values broken out and across different rows 
+*/
+
+/*markdown
+#### Stays Pricing Transparency and Cancellation Impact
+*/
+
+/*markdown
+##### You are a Data Scientist on the Airbnb Stays team, focusing on analyzing guest booking behaviors. Your team is investigating how pricing transparency and cancellation policies influence booking completion rates and daily booking volume. The goal is to provide insights into how these factors impact booking conversions and inform strategies to optimize guest satisfaction and booking success.
+*/
+
+/*markdown
+###### What is the average booking completion rate for properties with 'low' and 'high' pricing transparency levels during April 2024? Use a 7-day rolling window to capture short-term trends. This analysis will help us understand the impact of pricing transparency on booking conversions.
+*/
+
+WITH aggregator AS (
+  SELECT pricing_transparency_level, booking_date, completion_status, 
+  SUM(CASE WHEN completion_status = 'completed'  THEN 1 ELSE 0 END) / COUNT(*) AS completion_rate,
+  COUNT(*) AS attempt_count
+FROM fct_bookings
+WHERE booking_date BETWEEN '2024-04-01' AND '2024-04-30'
+  AND pricing_transparency_level IN ('low','high')
+GROUP BY 1, 2
+)
+SELECT pricing_transparency_level, booking_date,
+  AVG(completion_rate) OVER 
+  (PARTITION BY pricing_transparency_level ORDER BY booking_date ASC
+  ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS avg_completion
+  FROM aggregator
+
+/*markdown
+###### What are the day-over-day changes number of bookings for properties with varying cancellation policies in April 2024? Compare each day with the previous day to reveal trends over time. This analysis will help us assess how cancellation policies influence booking volume on a daily basis.
+*/
+
+SELECT cancellation_policy, booking_date, COUNT(*) AS booking_attempts,
+  COUNT(*) - LAG(COUNT(*),1) OVER
+  (PARTITION BY cancellation_policy ORDER BY booking_date ASC) AS daily_booking_change
+  FROM fct_bookings
+  WHERE booking_date BETWEEN '2024-04-01' AND '2024-04-30'
+GROUP BY 1,2
+
+/*markdown
+###### What is the percentage difference in booking completion rates between properties with high pricing transparency and those with low transparency in April 2024, when also accounting for differing cancellation policies? Compute the booking completion rates separately for high and low transparency levels within each cancellation policy, then calculate the percentage difference between them to compare the results.
+
+
+
+*/
+
+WITH completion_rate_table AS (
+  SELECT pricing_transparency_level, cancellation_policy, 
+  SUM(1.0*CASE WHEN completion_status = 'completed' THEN 1 ELSE 0 END) / COUNT(*) AS completion_rate
+FROM fct_bookings
+WHERE booking_date BETWEEN '2024-04-01' AND '2024-04-30' 
+  AND pricing_transparency_level IN ('low','high')
+GROUP BY 1,2
+)
+SELECT pricing_transparency_level, cancellation_policy, completion_rate, 
+  ((completion_rate - LEAD(completion_rate, 1) OVER
+  (PARTITION BY cancellation_policy ORDER BY pricing_transparency_level ASC)) / completion_rate
+  )*100.0 AS percent_change
+  FROM completion_rate_table
+GROUP BY 1,2
+
+/*markdown
+In part one, I got the SUM(CASE) built out neatly, but that only got the total completions. If there was more than one attempt per day, I would have returned an inflated value. By dividing by the count, that is adjusted for.
+Part two wasn't particularly tricky, but part three was!
+This one required a lot of work, combining a complicated SUM(CASE) and a LAG function. But I won!
+*/
+
+/*markdown
+#### Teams Chat Productivity and Collaboration Insights
+*/
+
+/*markdown
+##### You are a Product Analyst on the Microsoft Teams collaboration platform. Your team is focused on enhancing user engagement with chat features to streamline communication and reduce the need for switching between applications. By analyzing user interaction data, you aim to identify key usage patterns and prioritize feature improvements that will drive user satisfaction and efficiency.
+*/
+
+/*markdown
+###### For October 2024, what is the average number of chat messages sent per user in Microsoft Teams? This baseline metric will help us understand overall user engagement.
+*/
+
+WITH aggregator AS (
+  SELECT user_id, COUNT(*) as message_count
+  FROM fct_chat_interactions
+  WHERE interaction_date BETWEEN '2024-10-01' AND '2024-10-31'
+  GROUP BY 1
+  )
+SELECT AVG(message_count) as avg_chats_per_user FROM aggregator
+
+/*markdown
+###### In October 2024, which are the top five chat features ranked by the number of unique users interacting with them? Identifying these features will help prioritize enhancements to reduce context-switching.
+*/
+
+SELECT feature_used, COUNT(DISTINCT user_id)
+  FROM fct_chat_interactions
+  WHERE interaction_date BETWEEN '2024-10-01' AND '2024-10-31'
+  GROUP BY 1
+  ORDER BY 2 DESC
+  LIMIT 5
+
+/*markdown
+###### For October 2024, what percentage of highly engaged users (those sending more than 50 messages) used the 'reply' feature at least once? This metric directly informs recommendations for feature enhancements that boost engagement and minimize context-switching.
+*/
+
+WITH counts AS (
+   SELECT user_id, COUNT(message_id) as message_count, MAX(CASE
+   WHEN feature_used = 'reply' THEN 1 END) AS replies
+  FROM fct_chat_interactions
+  WHERE interaction_date BETWEEN '2024-10-01' AND '2024-10-31'
+  GROUP BY 1
+  HAVING COUNT(message_id) > 50
+   )
+SELECT ROUND(1.0*COUNT(replies) / COUNT(user_id),2) AS percent_engaged_repliers
+FROM counts
+
+/*markdown
+I had to collapse the CASE using MAX like I've done before. This is because without MAX, the CASE would only return the value of the last row, meaning this would only correctly count replies if the reply was the last interaction recorded. I tried specifically to avoid having to do multiple CTEs, so I'm glad that was successful.
+*/
+
+/*markdown
+#### Mobile App User Session Continuation Patterns
+*/
+
+/*markdown
+##### As a Data Analyst on the Netflix Mobile Experience team, you are investigating how users resume watching shows on mobile devices to enhance the seamless viewing experience. Your goal is to analyze user engagement through resume events, understand the distribution of these events per user, and identify the most popular shows for resumption on different mobile platforms. This analysis will help product managers optimize the app's resume functionality and reduce friction in content consumption.
+*/
+
+/*markdown
+###### For the week from October 1st to October 7th, 2024, how many total resume events occurred on mobile devices? This analysis will help the Netflix Mobile Experience team evaluate overall user engagement during content resumption.
+*/
+
+SELECT COUNT(*) as mobile_resumption_count
+  FROM fct_user_resumptions
+WHERE resumption_timestamp BETWEEN '2024-10-01 00:00:00' AND '2024-10-07 23:59:59'
+AND device_type IN ('iOS', 'Android')
+
+/*markdown
+###### For October 2024, we want to analyze the distribution of resume events per user. Calculate the median, 90th percentile, and maximum number of resume events across users who had at least 1 resume event.
+*/
+
+WITH aggregator AS (
+  SELECT user_id, count(user_id) AS user_count,
+  PERCENT_RANK() OVER (ORDER BY COUNT(user_id)) AS rank_percent
+  FROM fct_user_resumptions
+  WHERE resumption_timestamp LIKE '2024-10%'
+  GROUP BY 1
+)
+SELECT max(user_count),
+  (SELECT user_count FROM aggregator WHERE rank_percent >= .5 LIMIT 1) AS median,
+  (SELECT user_count FROM aggregator WHERE rank_percent >= .9 LIMIT 1) AS ninetieth_percentile
+FROM aggregator
+
+/*markdown
+###### During the fourth quarter of 2024, which show titles generated the highest number of resume events on each device type?
+*/
+
+WITH resumption_count AS (
+  SELECT show_title, device_type, COUNT(*) AS counter,
+  ROW_NUMBER() OVER (PARTITION BY device_type ORDER BY COUNT(*) DESC) AS rank_num
+  FROM  fct_user_resumptions
+  WHERE resumption_timestamp BETWEEN '2024-10-01' AND '2024-12-31'
+GROUP BY 1,2
+  )
+SELECT show_title, device_type, counter FROM resumption_count WHERE rank_num = 1
+
+
+/*markdown
+The second problem had big new learnings for me, first in the usage of PERCENT_RANK and second in the use of subqueries with a LIMIT to find the specific values within the percent rank function.
+*/
+
+/*markdown
+#### WhatsApp Call and Group Chat Interface Usage
+
+*/
+
+/*markdown
+##### You are a Data Scientist on the WhatsApp consumer experience team focusing on enhancing user interaction with call and group chat features. Your team aims to understand user engagement patterns with family-focused group chats, average call durations, and group chat participation levels. The end goal is to simplify the user interface and interaction flows based on these insights.
+
+
+*/
+
+/*markdown
+###### How many distinct users have participated in group chats with names containing the word ''family'', where the chat was created in April 2024? This analysis will inform product managers about user engagement trends with family-focused chat groups.
+
+
+*/
+
+SELECT COUNT(DISTINCT g.user_id) AS distinct_user_id_count
+FROM fct_group_chats g
+  LEFT JOIN fct_user_calls u
+  ON u.user_id = g.user_id
+  WHERE chat_creation_date LIKE '2024-04%' AND
+UPPER(chat_name) LIKE '%FAMILY%'
+
+/*markdown
+###### To better understand user call behavior, we want to analyze the total call duration per user in May 2024. What is the average total call duration across all users?
+*/
+
+WITH aggregator AS (
+  SELECT user_id, SUM(call_duration) AS call_duration_sum
+FROM fct_user_calls
+WHERE call_date LIKE '2024-05%'
+GROUP BY 1
+  )
+SELECT user_id, call_duration_sum,
+  AVG(call_duration_sum) OVER () AS avg_call_duration_per_user
+FROM aggregator
+GROUP BY 1
+
+/*markdown
+###### What is the maximum number of group chats any user has participated in during the second quarter of 2024 and how does this compare to the average participation rate? This insight will guide decisions on simplifying the chat interface for both heavy and average users.
+*/
+
+WITH call_count AS (
+  SELECT user_id, COUNT(user_id) AS user_count
+  FROM fct_group_chats
+  WHERE chat_creation_date BETWEEN '2024-04-01' AND '2024-06-30'
+  GROUP BY 1
+)
+  SELECT MAX(user_count), AVG(user_count)
+  FROM call_count
+
+/*markdown
+These questions targeted my ability to perform joins, aggregates of aggregates, and the use of wildcard string functions. Window fnunctions played a role as well.
 */
 
 /*markdown
