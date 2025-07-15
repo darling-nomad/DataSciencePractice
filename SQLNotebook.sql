@@ -166,6 +166,61 @@ FROMX table;
 */
 
 /*markdown
+#### Eyewear Selection and Pricing in Vision Center
+*/
+
+/*markdown
+##### You are a Data Analyst for the Walmart Vision Center team focused on understanding customer preferences and product performance in eyewear. Your team is interested in analyzing how different styles and price points influence customer satisfaction and sales volume. By leveraging data, you aim to identify the most popular styles, assess customer satisfaction for top-selling items, and determine the best-performing product combinations to inform strategic decisions on inventory and pricing.
+*/
+
+/*markdown
+###### Using sales data from January 2024, what are the top 3 eyewear styles by total units sold and what is the total number of units sold for each style? This query helps identify the most popular styles among customers.
+*/
+
+SELECT style, SUM(quantity_sold) AS total_sold
+  FROM fct_sales
+  JOIN dim_products
+  ON fct_sales.product_id = dim_products.product_id
+  WHERE sale_date LIKE '2024-01%'
+  GROUP BY 1
+  ORDER BY 2 DESC
+  LIMIT 3
+
+/*markdown
+###### For each eyewear style sold in January 2024, what is the customer rating for the sale event that achieved the highest number of units sold? If there is a tie for highest units sold, return the event with the highest customer satisfaction rating. This query helps us understand if our most active buyers are happy with their purchase.
+*/
+
+WITH ranked_style AS (
+  SELECT style, sale_id, customer_satisfaction, quantity_sold,
+  RANK() OVER (PARTITION BY style ORDER BY quantity_sold DESC, customer_satisfaction DESC) AS sale_rank
+  FROM fct_sales
+  JOIN dim_products
+  ON fct_sales.product_id = dim_products.product_id
+  WHERE sale_date LIKE '2024-01%'
+  )
+SELECT * FROM ranked_style WHERE sale_rank = 1
+
+/*markdown
+###### For each unique combination of eyewear style and price point in January 2024, calculate the product performance score. Product performance score is defined as the total units sold multiplied by the average customer satisfaction score. Which combination has the highest product performance score? <br> Note: to derive the price point for each sale, you can divide the sale_amount by the quantity_sold. This query will inform strategic decisions by identifying the mix of style and price point that best drives both sales and customer satisfaction.
+
+
+
+*/
+
+SELECT style, sale_amount/quantity_sold AS price_point,
+   ROUND(SUM(quantity_sold) * AVG(customer_satisfaction),2) AS product_performance
+FROM fct_sales
+  JOIN dim_products
+  ON fct_sales.product_id = dim_products.product_id
+   WHERE sale_date LIKE '2024-01%'
+GROUP BY 1, 2
+ORDER BY 3 DESC
+
+/*markdown
+Part two was tricky until I realized that I needed to use rank instead of trying to break out traditionally. Straightforward otherwise.
+*/
+
+/*markdown
 #### Stays Host Communication Response Time Impact
 */
 
