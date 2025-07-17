@@ -166,6 +166,63 @@ FROMX table;
 */
 
 /*markdown
+#### Ecommerce Shipping Performance for Customer Satisfaction
+*/
+
+/*markdown
+##### You are a Data Analyst for Walmart.com's Shipping Experience team, tasked with assessing the reliability of shipping across different product categories. Your team is focused on identifying variations in shipping performance to find opportunities for improvement. The goal is to determine which product categories have the most reliable shipping and to rank them accordingly.
+*/
+
+/*markdown
+###### What is the total count of orders with reliable shipping (i.e., delivered on or before the expected delivery date) for each product category in December 2024?
+*/
+
+SELECT category_name, COUNT(*)
+  FROM fct_orders
+  JOIN dim_product_categories
+  ON fct_orders.product_category_id = dim_product_categories.product_category_id
+WHERE order_date LIKE '2024-12%'
+  AND actual_delivery_date <= expected_delivery_date
+GROUP BY 1
+
+/*markdown
+###### Calculate the percentage of orders with unreliable shipping for each product category in December 2024. We define unreliable shipping as orders that were delivered after the expected delivery date, or orders that don’t currently have an actual delivery date.
+*/
+
+SELECT category_name, 100.0*SUM(CASE
+   WHEN actual_delivery_date > expected_delivery_date
+   THEN 1
+   WHEN actual_delivery_date IS NULL THEN 1
+   ELSE 0 END)/ COUNT(*) AS percent_unreliable
+  FROM fct_orders
+  JOIN dim_product_categories
+  ON fct_orders.product_category_id = dim_product_categories.product_category_id
+WHERE order_date LIKE '2024-12%'
+GROUP BY 1
+
+/*markdown
+###### Rank product categories into four performance quartiles based on the percentage of reliable shipping in December 2024. Identify which quartile each product category falls into. Recall that reliable shipping is defined as orders delivered on or before the expected delivery date.
+*/
+
+WITH percent_ranked AS (
+  SELECT category_name, 100.0*SUM(CASE
+   WHEN actual_delivery_date <= expected_delivery_date
+   THEN 1
+   ELSE 0 END)/ COUNT(*) AS percent_reliable
+  FROM fct_orders
+  JOIN dim_product_categories
+  ON fct_orders.product_category_id = dim_product_categories.product_category_id
+WHERE order_date LIKE '2024-12%'
+GROUP BY 1
+  )
+SELECT category_name, NTILE(4) OVER (ORDER BY percent_reliable ASC) AS quartile
+  FROM percent_ranked
+
+/*markdown
+This problem came with interesting opportunities to use case and ntile to classify and assign values to metrics. 
+*/
+
+/*markdown
 #### Eyewear Selection and Pricing in Vision Center
 */
 
