@@ -166,7 +166,50 @@ FROMX table;
 */
 
 /*markdown
-#### Problem Title (template)
+#### Marketplace Payout Fees and Compliance Variations
+*/
+
+/*markdown
+##### As a Data Analyst on the Stripe Connect team, you are tasked with evaluating payment performance across various marketplace segments. Your team is focused on understanding how payout fees and compliance costs differ between platform types to identify opportunities for optimizing fee structures and compliance strategies. Your goal is to provide insights that will help streamline costs and improve operational efficiency across segments.
+*/
+
+/*markdown
+###### What is the average payout fee per transaction for each marketplace segment during April 2024? This result will provide an initial benchmark for fee structures by segment.
+*/
+
+SELECT marketplace_segment, AVG(payout_fee) AS avg_payout
+FROM fct_transactions
+WHERE transaction_date LIKE '2024-04%'
+GROUP BY 1
+
+/*markdown
+###### For each marketplace segment, what is the total compliance costs in April 2024? This metric will help evaluate the efficiency of current compliance strategies.
+*/
+
+SELECT marketplace_segment, SUM(compliance_cost) AS total_compliance_cost
+FROM fct_transactions
+WHERE transaction_date LIKE '2024-04%'
+GROUP BY 1
+
+/*markdown
+###### We know that one of the marketplace segments exhibited both the lowest total compliance overhead and the lowest average payout fee structures in April 2024. Can you identify which one it is?
+*/
+
+ WITH cte AS (
+   SELECT marketplace_segment,
+     AVG(payout_fee) AS avg_payout,
+     SUM(compliance_cost) AS total_compliance_cost,
+   RANK() OVER (ORDER BY AVG(payout_fee) ASC) AS payout_rank,
+   RANK() OVER (ORDER BY SUM(compliance_cost) ASC) AS cost_rank
+FROM fct_transactions
+WHERE transaction_date LIKE '2024-04%'
+GROUP BY 1
+ )
+SELECT * FROM cte
+WHERE payout_rank = 1 AND cost_rank = 1
+
+/*markdown
+This one was really easy. I nailed every prompt on the first try!
 */
 
 /*markdown
