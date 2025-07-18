@@ -166,6 +166,68 @@ FROMX table;
 */
 
 /*markdown
+#### Feed Content Quality: Engagement and Insights Impact
+*/
+
+/*markdown
+##### As a Product Analyst on the LinkedIn Feed team, you are tasked with analyzing how different content types impact user engagement on the platform. Your team is focused on understanding which types of content consistently drive higher engagement scores. The ultimate goal is to leverage these insights to enhance content recommendation strategies and improve user experience on the feed.
+*/
+
+/*markdown
+###### Identify which content formats performed best in July 2024 by reporting their average engagement scores, but only list the formats that achieved an average score of 50 or higher.
+*/
+
+SELECT content_type, AVG(engagement_score) AS avg_engagement_score
+FROM fct_user_engagement
+JOIN dim_content
+  ON fct_user_engagement.content_id = dim_content.content_id
+WHERE engagement_date LIKE '2024-07%'
+GROUP BY 1
+HAVING AVG(engagement_score) >= 50
+  ORDER BY 2 DESC
+
+/*markdown
+###### For the first week of August 2024, identify the content type of the content that had the highest engagement score. For that content type, calculate the average engagement score for the entire month of August. If there is a tie for highest engagement score, select the content type with the earliest publish date.
+*/
+
+SELECT content_type, AVG(engagement_score)
+FROM fct_user_engagement
+JOIN dim_content
+  ON fct_user_engagement.content_id = dim_content.content_id
+WHERE engagement_date LIKE '2024-08%' AND 
+ content_type IN (SELECT content_type
+FROM fct_user_engagement
+JOIN dim_content
+  ON fct_user_engagement.content_id = dim_content.content_id
+WHERE engagement_date BETWEEN '2024-08-01' AND '2024-08-07'
+ORDER BY engagement_score DESC, publish_date ASC
+LIMIT 1)
+
+/*markdown
+###### During Q3 2024, for each content type, calculate their highest engagement score each week. What was the average of those weekly highs over the quarter? This will help us identify content types that consistently generate peak engagement.
+*/
+
+WITH weekly_maxes AS ( 
+  SELECT content_type,
+   STRFTIME('%W', engagement_date) AS weeknum,
+   MAX(engagement_score) AS max_engagement
+FROM fct_user_engagement
+JOIN dim_content
+  ON fct_user_engagement.content_id = dim_content.content_id
+WHERE engagement_date BETWEEN '2024-07-01' AND '2024-09-30'
+GROUP BY 1,2
+ORDER BY 1, 2
+  )
+SELECT *,
+  ROUND(
+  AVG(max_engagement) OVER (PARTITION BY content_type),2) AS avg_weekly_max
+  FROM weekly_maxes
+
+/*markdown
+The takeaway: Part two was a little tricky with the subquery to get the content type to run the main query on, but I was able to puzzle through it well enough. I also got part three on my first try.
+*/
+
+/*markdown
 #### Marketplace Payout Fees and Compliance Variations
 */
 
@@ -288,20 +350,6 @@ ORDER BY change_rank
 
 /*markdown
 Part three was really tricky. Essentially, I had to take an aggregate, find the change over time for that aggregate, then average and rank the change over time. Very complex!
-*/
-
-/*markdown
-##### The background
-*/
-
-/*markdown
-###### The question
-*/
-
--- The code
-
-/*markdown
-The takeaway
 */
 
 /*markdown
