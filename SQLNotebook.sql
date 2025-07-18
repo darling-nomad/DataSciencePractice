@@ -166,6 +166,102 @@ FROMX table;
 */
 
 /*markdown
+#### Problem Title (template)
+*/
+
+/*markdown
+#### Capital Financing: Small Business Revenue Patterns
+*/
+
+/*markdown
+##### You are a Data Analyst on the Stripe Capital team, focused on assessing lending patterns for small businesses. Your team is investigating how transaction volumes and growth trends can inform financing eligibility decisions. The objective is to identify businesses with stable and growing revenue patterns to streamline lending processes.
+*/
+
+/*markdown
+###### For each business, what is the total transaction amount in January 2024, and how does its ranking compare to other businesses? This analysis will help establish baseline revenue activity levels for financing eligibility.
+*/
+
+SELECT business_name, SUM(transaction_amount) AS total_transactions,
+  RANK() OVER
+  (ORDER BY SUM(transaction_amount) DESC) AS ranknum
+FROM fct_transactions
+  JOIN dim_businesses
+  ON fct_transactions.business_id = dim_businesses.business_id
+WHERE transaction_date LIKE '2024-01%'
+GROUP BY 1
+
+/*markdown
+###### For each business, calculate the percentage change in total transaction amount from January 2024 to February 2024. This metric will assist in understanding recent revenue growth trends.
+*/
+
+/* 
+percent change is (a - b)/a
+*/
+WITH monthly_transactions AS (
+SELECT business_name, STRFTIME('%m',transaction_date) AS month_num,
+  SUM(transaction_amount) AS total_transactions
+FROM fct_transactions
+  JOIN dim_businesses
+  ON fct_transactions.business_id = dim_businesses.business_id
+  WHERE transaction_date BETWEEN '2024-01-01' AND '2024-02-28'
+GROUP BY 1, 2
+)
+SELECT business_name, month_num, total_transactions,
+  100.0*(total_transactions -
+  LAG(total_transactions, 1) OVER
+  (PARTITION BY business_name ORDER BY month_num ASC))
+  / LAG(total_transactions, 1) OVER
+  (PARTITION BY business_name ORDER BY month_num ASC) AS percent_transaction_change
+  FROM monthly_transactions
+
+/*markdown
+###### For each business, compute the month-over-month growth in total transaction amounts from January 2024 through March 2024. Rank each business based on this average growth (from highest to lowest), and return the rank number along with the business name and average growth.
+*/
+
+WITH monthly_transactions AS (
+SELECT business_name, STRFTIME('%m',transaction_date) AS month_num,
+  SUM(transaction_amount) AS total_transactions
+FROM fct_transactions
+  JOIN dim_businesses
+  ON fct_transactions.business_id = dim_businesses.business_id
+  WHERE transaction_date BETWEEN '2024-01-01' AND '2024-03-30'
+GROUP BY 1, 2
+), monthly_changes AS (
+SELECT business_name, month_num, total_transactions,
+  100.0*(total_transactions -
+  LAG(total_transactions, 1) OVER
+  (PARTITION BY business_name ORDER BY month_num ASC))
+  / LAG(total_transactions, 1) OVER
+  (PARTITION BY business_name ORDER BY month_num ASC) AS percent_transaction_change
+  FROM monthly_transactions
+  )
+SELECT business_name, AVG(percent_transaction_change) AS percent_change_avg,
+  RANK() OVER (
+  ORDER BY AVG(percent_transaction_change) DESC) AS change_rank
+  FROM monthly_changes
+GROUP BY business_name
+ORDER BY change_rank
+
+
+/*markdown
+Part three was really tricky. Essentially, I had to take an aggregate, find the change over time for that aggregate, then average and rank the change over time. Very complex!
+*/
+
+/*markdown
+##### The background
+*/
+
+/*markdown
+###### The question
+*/
+
+-- The code
+
+/*markdown
+The takeaway
+*/
+
+/*markdown
 #### Ecommerce Shipping Performance for Customer Satisfaction
 */
 
@@ -496,26 +592,20 @@ GROUP BY 1,2
   )
 SELECT show_title, device_type, counter FROM resumption_count WHERE rank_num = 1
 
-
 /*markdown
 The second problem had big new learnings for me, first in the usage of PERCENT_RANK and second in the use of subqueries with a LIMIT to find the specific values within the percent rank function.
 */
 
 /*markdown
 #### WhatsApp Call and Group Chat Interface Usage
-
 */
 
 /*markdown
 ##### You are a Data Scientist on the WhatsApp consumer experience team focusing on enhancing user interaction with call and group chat features. Your team aims to understand user engagement patterns with family-focused group chats, average call durations, and group chat participation levels. The end goal is to simplify the user interface and interaction flows based on these insights.
-
-
 */
 
 /*markdown
 ###### How many distinct users have participated in group chats with names containing the word ''family'', where the chat was created in April 2024? This analysis will inform product managers about user engagement trends with family-focused chat groups.
-
-
 */
 
 SELECT COUNT(DISTINCT g.user_id) AS distinct_user_id_count
@@ -559,19 +649,14 @@ These questions targeted my ability to perform joins, aggregates of aggregates, 
 
 /*markdown
 #### iPhone Camera Performance Across User Segments
-
 */
 
 /*markdown
 ##### As a Product Analyst on the iPhone Camera team, you are tasked with evaluating camera quality metrics across different user groups. Your team aims to understand variations in photo and video capture performance to identify opportunities for hardware or software improvements. The end goal is to prioritize future camera development efforts based on data-driven insights into user group performance trends.
-
-
 */
 
 /*markdown
 ###### For the month of July 2024, how do average photo capture quality scores vary across different user groups? This analysis will help us identify segments where camera performance improvements could be prioritized.
-
-
 */
 
 SELECT user_group_name, AVG(photo_quality_score)
@@ -583,7 +668,6 @@ GROUP BY 1
 
 /*markdown
 ###### Between August 1st and August 7th, 2024, how do photo capture quality scores change for each iPhone user group? Use a 3-day average rolling window for this analysis.
-
 
 
 */
@@ -599,7 +683,6 @@ WHERE capture_date BETWEEN '2024-08-01' AND '2024-08-07'
 
 /*markdown
 ###### For Q3 2024 (July 1st to September 30th), how do video capture quality scores trend for each iPhone user group when comparing each capture to the subsequent one? This insight will support our approach to optimize video performance through targeted hardware or software improvements.
-
 
 
 */
@@ -618,23 +701,14 @@ This was some good practice using window functions, one with a frame spec and an
 
 /*markdown
 #### Google Play Developer Monetization and Distribution Performance
-
 */
-
-
 
 /*markdown
 ##### You are a Data Analyst on the Google Play Developer Ecosystem team. Your team is focused on understanding how different app categories and monetization models influence developer revenue and app distribution. The goal is to provide strategic insights to optimize developer monetization strategies and enhance platform engagement.
-
-
 */
-
-
 
 /*markdown
 ###### For the month of April 2024, which app categories generated the highest total revenue (top 10 only)? This insight will be used to refine monetization strategies for developers.
-
-
 */
 
 SELECT category_name, SUM(revenue_amount) AS revenue_sum
@@ -648,9 +722,6 @@ LIMIT 10
 
 /*markdown
 ###### During the second quarter of 2024, how does the weekly revenue ranking of each app category change? The team will use this analysis to identify performance trends and adjust engagement efforts.
-
-
-
 */
 
 WITH weekly_rev AS (
@@ -669,10 +740,6 @@ FROM weekly_rev
 
 /*markdown
 ###### For apps using a subscription monetization model, can you give us the running total revenue by app for every day in April 2024? We are investigating a complaint from app developers about a slowdown in revenue in that month.
-
-
-
-
 */
 
 SELECT r.app_id, revenue_date, SUM(revenue_amount) OVER (PARTITION BY r.app_id ORDER BY revenue_date ASC)
@@ -686,11 +753,15 @@ Lots of good practice using window functions in these questions
 */
 
 /*markdown
-#### Google Ads Campaign Performance Optimization <br> You are a Data Analyst on the Google Ads Performance team working to optimize ad campaign strategies. The goal is to assess the diversity of ad formats, identify high-reach campaigns, and evaluate the return on investment across different campaign segments. Your team will use these insights to make strategic budget allocations and targeting adjustments for future campaigns. <br> For each ad campaign segment, what are the unique ad formats used during July 2024? This will help us understand the diversity in our ad formats.
+#### Google Ads Campaign Performance Optimization
+*/
 
+/*markdown
+##### You are a Data Analyst on the Google Ads Performance team working to optimize ad campaign strategies. The goal is to assess the diversity of ad formats, identify high-reach campaigns, and evaluate the return on investment across different campaign segments. Your team will use these insights to make strategic budget allocations and targeting adjustments for future campaigns.
+*/
 
-
-
+/*markdown
+###### For each ad campaign segment, what are the unique ad formats used during July 2024? This will help us understand the diversity in our ad formats.
 */
 
 SELECT DISTINCT ad_format, segment
@@ -702,7 +773,6 @@ GROUP BY 2
 
 /*markdown
 ###### How many unique campaigns had at least one rolling 7-day period in August 2024 where their total impressions exceeded 1,000? We want to identify campaigns that had a high reach in at least one 7-day window during this month.
-
 
 
 */
@@ -717,12 +787,7 @@ SELECT COUNT(DISTINCT campaign_id) FROM rolling
 WHERE rolling_sum > 1000 AND campaign_date LIKE '2024-08%'
 
 /*markdown
-What is the total ROI for each campaign segment in Q3 2024? And, how does it compare to the average ROI of all campaigns (return labels 'higher than average' or 'lower than average')? We will use this to identify which segments are outperforming the average.
-Note 1: ROI is defined as (revenue - cost) / cost.
-Note 2: For average ROI across segment, calculate the ROI per segment and then calculate the average ROI across segments.
-
-
-
+###### What is the total ROI for each campaign segment in Q3 2024? And, how does it compare to the average ROI of all campaigns (return labels 'higher than average' or 'lower than average')? We will use this to identify which segments are outperforming the average.
 */
 
 WITH roi_table AS (
@@ -745,7 +810,13 @@ This one had an interesting new learning for me, [frame specifications](https://
 
 /*markdown
 #### Phone Partnership Subscriber Retention Metrics 
+*/
+
+/*markdown
 ##### You are a Data Analyst in the Partnerships & Bundling team at a telecom company. Your team is investigating the impact of different telecom partners on Netflix subscriber conversion, retention, and engagement for phone plan bundles. The goal is to identify which partners drive the most conversions, longest retention, and highest engagement to inform future partnership strategies and pricing models. 
+*/
+
+/*markdown
 ###### For subscribers who converted in January 2024, give us the name of the Telecom partner that led to acquiring the most new subscribers?
 */
 
@@ -802,7 +873,6 @@ This one wasn't too hard, though it tried to get a little tricky with the differ
 
 /*markdown
 #### Creators Growth: Engagement and Follower Metrics
-
 */
 
 /*markdown
@@ -810,15 +880,7 @@ This one wasn't too hard, though it tried to get a little tricky with the differ
 */
 
 /*markdown
-
-*/
-
-/*markdown
 ###### For content published in May 2024, which creator IDs show the highest new follower growth within each content type? If a creator published multiple of the same content type, we want to look at the total new follower growth from that content type.
-*/
-
-
-
 */
 
 WITH growth AS (
@@ -831,10 +893,7 @@ GROUP BY 1, 2
 SELECT * FROM growth WHERE rownum = 1
 
 /*markdown
-
 ###### Your Product Manager requests a report that shows impressions, likes, comments, and shares for each content type between April 8 and 21, 2024. She specifically requests that engagement metrics are unpivoted into a single 'metric type' column.
-
-
 */
 
 SELECT content_type, 'impressions' AS metric, SUM(impressions_count) AS total
@@ -862,10 +921,7 @@ GROUP BY 1
 */
 
 /*markdown
-
 ###### For content published between April and June 2024, can you calculate for each creator, what % of their new followers came from each content type?
-
-
 */
 
 SELECT content_type, creator_id,
@@ -884,21 +940,11 @@ The last problem was interesting in that I used a window function to get help me
 */
 
 /*markdown
-/*markdown
-*/
-
-/*markdown
 ##### As a Data Analyst on Apple's Corporate Social Responsibility team, you are tasked with evaluating the effectiveness of recent philanthropic initiatives. Your focus is on understanding participant engagement across different communities and programs. The insights you gather will guide strategic decisions for resource allocation and future program expansions.
-*/
-*/
-
-/*markdown
-/*markdown
 */
 
 /*markdown
 ###### Apple's Corporate Social Responsibility team wants a summary report of philanthropic initiatives in January 2024. Please compile a report that aggregates participant numbers by community and by program.
-*/
 */
 
 SELECT community_name, program_name, SUM(participants) AS total_participants
@@ -909,10 +955,7 @@ ON c.community_id = i.community_id
 GROUP BY 1, 2
 
 /*markdown
-
 ###### The team is reviewing the execution of February 2024 philanthropic programs. For each initiative, provide details along with the earliest event date recorded within each program campaign to understand start timings.
-
-
 */
 
 SELECT program_name, community_name, i.community_id, region, MIN(event_date)
@@ -923,10 +966,7 @@ WHERE event_date LIKE '2024-02%'
 GROUP BY 1, 2, 3, 4
 
 /*markdown
-
 ###### For a refined analysis of initiatives held during the first week of March 2024, include for each program the maximum participation count recorded in any event. This information will help highlight the highest engagement levels within each campaign.
-
-
 */
 
 SELECT program_name, MAX(participants)
@@ -941,13 +981,11 @@ This problem set felt really easy all across the board. Like, besides interpreti
 */
 
 /*markdown
-
 #### Prime Member Exclusive Product Engagement Metrics
 */
 
 /*markdown
-
-##### As a Data Analyst on the Amazon Prime product analytics team, you are tasked with evaluating Prime member engagement with exclusive promotions. Your team is focused on understanding how members interact with special deals and early product access. The goal is to identify engagement patterns and target highly engaged members to enhance member value and drive higher engagement with these offerings.
+##### As a Data Analyst on the Amazon Prime product analytics team, you are tasked with evaluating Prime member engagement with exclusive promotions. Your team is focused on understanding how members interact with special deals and early product access. The goal is to identify engagement patterns and target highly engaged members to enhance member value and drive higher engagement with these offerings
 */
 
 SELECT COUNT(DISTINCT member_id) AS deal_purchasers, COUNT(*) / COUNT(DISTINCT member_id) AS avg_purchases_per_user
@@ -955,10 +993,7 @@ FROM fct_prime_deals
 WHERE purchase_date LIKE '2024-01%'
 
 /*markdown
-
 ###### To gain insights into purchase patterns, what is the distribution of members based on the number of deals purchased in February 2024? Group the members into the following categories: 1-2 deals, 3-5 deals, and more than 5 deals.
-
-
 */
 
 WITH cte AS (
@@ -976,10 +1011,7 @@ FROM cte
 GROUP BY 1
 
 /*markdown
-
 ###### To target highly engaged members for tailored promotions, can we identify Prime members who purchased more than 5 exclusive deals between January 1st and March 31st, 2024? How many such members are there and what is their average total spend on these deals?
-
-
 */
 
 WITH high_spenders AS (
@@ -996,12 +1028,10 @@ I initially made this one way harder than it was, trying to use subqueries to fi
 */
 
 /*markdown
-
 #### Third-Party Seller Fees and Performance Metrics
 */
 
 /*markdown
-
 ###### For each seller, please identify their top sale transaction in April 2024 based on sale amount. If there are multiple transactions with the same sale amount, select the one with the most recent sale_date.
 */
 
@@ -1043,10 +1073,7 @@ This one was really tricky and I needed a lot of help with it. Specifically, I n
 */
 
 /*markdown
-
 ###### Using June 2024, for each seller, create a daily report that computes a cumulative count of transactions up to that day.
-
-
 */
 
 SELECT seller_id, sale_date, COUNT(*) OVER (PARTITION BY seller_id ORDER BY sale_date)
@@ -1060,13 +1087,10 @@ Part three was MUCH easier than part two, or even part one, haha. The main thing
 
 /*markdown
 #### Google Pay Digital Wallet Transaction Security Patterns
-
-
 */
 
 /*markdown
 ##### You are a Product Analyst on the Google Pay security team focused on improving the reliability of digital payments. Your team needs to analyze transaction success and failure rates across various merchant categories to identify potential friction points in payment experiences. By understanding these patterns, you aim to guide product improvements for a smoother and more reliable payment process.
-
 */
 
 /*markdown
@@ -1079,7 +1103,6 @@ WHERE transaction_date LIKE "2024-01%"
 GROUP BY 1, 2
 
 /*markdown
-
 ###### For the first quarter of 2024, which merchant categories recorded a transaction success rate below 90%? This insight will guide our prioritization of security enhancements to improve payment reliability.
 */
 
@@ -1101,10 +1124,7 @@ SELECT merchant_category, transaction_success_rate
 GROUP BY 1
 
 /*markdown
-
 ###### From January 1st to March 31st, 2024, can you generate a list of merchant categories with their concatenated counts for successful and failed transactions? Then, rank the categories by total transaction volume. This ranking will support our assessment of areas where mixed transaction outcomes may affect user experience.
-
-
 */
 
 SELECT merchant_category, CONCAT(SUM(CASE
@@ -1221,10 +1241,12 @@ I didn't know you could call one cte in another cte, that's wild. It was really 
 #### Reorder Patterns for Amazon Fresh
 */
 
+/*markdown
 
 ##### As a Data Analyst on the Amazon Fresh product team, you and your team are focused on enhancing the customer experience by streamlining the process for customers to reorder their favorite grocery items. Your goal is to identify the most frequently reordered product categories, understand customer preferences for these products, and calculate the average reorder frequency across categories. By analyzing these metrics, you aim to provide actionable insights that will inform strategies to improve customer satisfaction and retention.
 
 
+*/
 
 /*markdown
 ###### The product team wants to analyze the most frequently reordered product categories. Can you provide a list of the product category codes (using first 3 letters of product code) and their reorder counts for Q4 2024?
