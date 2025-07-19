@@ -166,6 +166,80 @@ FROMX table;
 */
 
 /*markdown
+#### Advertiser Campaign Performance by Audience Segments
+*/
+
+/*markdown
+##### You are a Data Analyst working with the X for Advertisers team to evaluate the effectiveness of advertising campaigns across various audience segments. Your team aims to understand how different audience groups are engaging with the campaigns to optimize targeting strategies. By analyzing engagement metrics, you will identify trends and growth rates to enhance campaign performance.
+*/
+
+/*markdown
+###### What is the monthly total engagement count for each audience segment in April 2024 and May 2024? Hint: there is some messy data in the audience segment column, so you might want to clean that up first.
+*/
+
+SELECT UPPER(audience_segment) AS audience_segment,
+STRFTIME('%m', engagement_date) AS month_num,
+SUM(engagement_count) AS total_engagement
+FROM fct_campaign_engagement
+WHERE engagement_date BETWEEN '2024-04-01' AND '2024-05-31'
+GROUP BY 1, 2
+
+/*markdown
+###### What is the monthly engagement growth rates from April 2024 to May 2024? This calculation will help the X for Advertisers team understand basic engagement performance trends across audience groups for campaign optimization.
+*/
+
+WITH cte AS (
+  SELECT UPPER(audience_segment) AS audience_segment,
+STRFTIME('%m', engagement_date) AS month_num,
+SUM(engagement_count) AS total_engagement
+FROM fct_campaign_engagement
+WHERE engagement_date BETWEEN '2024-04-01' AND '2024-05-31'
+GROUP BY 1, 2
+  )
+SELECT *,
+  ROUND(100.*(total_engagement - LAG(total_engagement, 1) OVER
+  (PARTITION BY audience_segment 
+  ORDER BY month_num ASC)) / LAG(total_engagement, 1) OVER
+  (PARTITION BY audience_segment 
+  ORDER BY month_num ASC),2)
+  AS percent_engagement_change
+  FROM cte
+
+/*markdown
+###### Which audience segments had the highest engagement growth rate from April 2024 to May 2024, and which had the lowest? Don't forget to clean up the inconsistent capitalization in the audience segment column. Identifying these trends will help the X for Advertisers team optimize targeting strategies by focusing on the most responsive audience segments.
+*/
+
+WITH cte AS (
+  SELECT UPPER(audience_segment) AS audience_segment,
+STRFTIME('%m', engagement_date) AS month_num,
+SUM(engagement_count) AS total_engagement
+FROM fct_campaign_engagement
+WHERE engagement_date BETWEEN '2024-04-01' AND '2024-05-31'
+GROUP BY 1, 2
+  ), cte2 AS (
+SELECT *,
+  ROUND(100.*(total_engagement - LAG(total_engagement, 1) OVER
+  (PARTITION BY audience_segment 
+  ORDER BY month_num ASC)) / LAG(total_engagement, 1) OVER
+  (PARTITION BY audience_segment 
+  ORDER BY month_num ASC),2)
+  AS percent_engagement_change
+  FROM cte
+   ), cte3 AS (
+SELECT *, RANK() OVER 
+   ( 
+   ORDER BY percent_engagement_change) AS rank_num
+   FROM cte2
+WHERE percent_engagement_change IS NOT NULL
+   )
+SELECT audience_segment, percent_engagement_change FROM cte3 WHERE rank_num = 1
+   OR rank_num = (SELECT MAX(rank_num) FROM cte3)
+
+/*markdown
+This one challenged me, cleaning the strings, using lots of window functions and then ranking on those window functions, it was all really interesting.
+*/
+
+/*markdown
 #### Feed Content Quality: Engagement and Insights Impact
 */
 
