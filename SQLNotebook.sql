@@ -33,7 +33,21 @@ The takeaway
 */
 
 /*markdown
+Indices basically create unique values based on an identifier and then the queries only search the rows with relevant identifiers. It basically lets the query "skip" irrelevant rows.
+*/
 
+/*markdown
+##### JULIANDAY
+*/
+
+  SELECT 
+  SUM((JULIANDAY(trip_end_time) - 
+  JULIANDAY(trip_start_time))*24) 
+  AS total_earnings_per_hour
+  FROM table
+
+/*markdown
+JULIANDAY returns days and you can convert that to hours by multiplying by 24. This is useful when you need to calculate the number of hours or days between two events. TIMEDIFF returns a value in date-time format, and is more difficult to use with aggregation.
 */
 
 /*markdown
@@ -163,6 +177,125 @@ FROMX table;
 
 /*markdown
 ### Interview Master
+*/
+
+/*markdown
+#### Driver Earnings Optimization for Ride Efficiency
+*/
+
+/*markdown
+##### As a Data Analyst on the Rides Performance team, you are investigating how to reduce driver idle time and improve trip allocation strategies. The goal is to analyze driver trip patterns and identify opportunities to maximize earnings per active hour. Your analysis will help develop targeted recommendations to increase driver productivity and overall earnings.
+*/
+
+/*markdown
+###### Based on October 2024 data, what was the average trip earnings per active hour? We want to calculate the trip earnings per hour for each driver, and then get the average across all drivers.
+*/
+
+WITH cte AS (
+  SELECT driver_id, 
+    SUM(earnings) /
+  SUM((JULIANDAY(trip_end_time) - JULIANDAY(trip_start_time))*24) AS total_earnings_per_hour
+FROM fct_trips
+  WHERE trip_start_time LIKE '2024-10%'
+GROUP BY 1
+)
+SELECT driver_id, total_earnings_per_hour,
+  AVG(total_earnings_per_hour) OVER() AS avg_earnings_per_hour from cte
+
+/*markdown
+###### For each driver, identify the next trip following a trip and calculate the idle time between the previous trip's end and that next trip's start. Look only at trips that started in October 2024. This analysis will pinpoint specific downtime intervals that could be reduced to enhance ride allocation.
+*/
+
+SELECT driver_id, trip_start_time, trip_end_time, 
+   LAG(trip_end_time,1) OVER 
+   (PARTITION BY driver_id ORDER BY trip_end_time ASC) AS last_trip_end_time,
+   JULIANDAY(trip_start_time)*24 - 
+   LAG(JULIANDAY(trip_end_time)*24,1) OVER 
+   (PARTITION BY driver_id ORDER BY trip_end_time ASC) AS idle_time
+FROM fct_trips
+  WHERE trip_start_time LIKE '2024-10%'
+
+/*markdown
+###### For October 2024, identify the top 2 drivers with the shortest average idle time between consecutive trips. We aim to reach out to these drivers to understand their strategies for minimizing idle time.
+*/
+
+WITH cte AS (
+  SELECT driver_id, trip_start_time, trip_end_time, 
+   LAG(trip_end_time,1) OVER 
+   (PARTITION BY driver_id ORDER BY trip_end_time ASC) AS last_trip_end_time,
+   JULIANDAY(trip_start_time)*24 - 
+   LAG(JULIANDAY(trip_end_time)*24,1) OVER 
+   (PARTITION BY driver_id ORDER BY trip_end_time ASC) AS idle_time
+FROM fct_trips
+  WHERE trip_start_time LIKE '2024-10%'
+  )
+SELECT driver_id, avg(idle_time) FROM cte
+GROUP BY 1
+  ORDER BY 2 ASC
+LIMIT 2
+
+/*markdown
+Calculating the hours between the start time and end time was tricky. I initially wanted to use TIMEDIFF, but that returned a date value instead of a value I could convert to hours. JULIANDAY returns days and you can convert that to hours by multiplying by 24. Once I had that sorted, everything else flowed easily.
+*/
+
+/*markdown
+#### ChatGPT User Query Performance and Engagement
+*/
+
+/*markdown
+##### As a Product Analyst on the ChatGPT team, you are tasked with understanding how query complexity affects user engagement and system performance. Your team is particularly interested in identifying which complexity levels provide the best balance between user satisfaction and response efficiency. By analyzing these patterns, your goal is to recommend optimizations for enhancing user experience while maintaining system performance.
+*/
+
+/*markdown
+###### What is the average response time for each query complexity level in January 2024?
+*/
+
+SELECT complexity_level, ROUND(AVG(response_time_seconds),2) AS avg_response_time
+FROM fct_queries
+WHERE query_date LIKE '2024-01%'
+GROUP BY 1
+
+/*markdown
+###### For each query complexity level, what is the average user satisfaction score for queries that took more than 2 seconds to respond in January 2024?
+*/
+
+SELECT complexity_level, ROUND(AVG(satisfaction_score),2) AS avg_response_time
+FROM fct_queries q
+   JOIN fct_user_engagement e
+   ON q.query_id = e.query_id
+WHERE query_date LIKE '2024-01%'
+AND response_time_seconds > 2
+GROUP BY 1
+
+/*markdown
+###### We want to identify the complexity level that optimizes both user engagement and system efficiency. Rank average user satisfaction (high to low) and average response time (low to high) across different complexity levels in January 2024. Which level has the best average satisfaction & response time ranking?
+*/
+
+WITH cte AS (
+  SELECT complexity_level, 
+ROUND(AVG(response_time_seconds),2) AS avg_response_time,
+   ROUND(AVG(satisfaction_score),2) AS avg_satisfaction_score
+FROM fct_queries q
+   JOIN fct_user_engagement e
+   ON q.query_id = e.query_id
+WHERE query_date LIKE '2024-01%'
+GROUP BY 1
+  ), cte2 AS (
+SELECT complexity_level, 
+  RANK() OVER 
+  (ORDER BY avg_response_time) AS response_rank,
+RANK() OVER 
+  (ORDER BY avg_satisfaction_score DESC) AS score_rank
+FROM cte
+ORDER BY 1 ASC
+  )
+SELECT complexity_level, (response_rank + score_rank / 2) AS avg_rank
+FROM cte2
+  WHERE avg_rank = (SELECT MIN(response_rank + score_rank / 2) FROM cte2)
+ORDER BY 2 ASC
+
+/*markdown
+Pretty straightforward, some filtering on conditionals, window functions to rank results, and then logic to select the lowest results including ties.
 */
 
 /*markdown
