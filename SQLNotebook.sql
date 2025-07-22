@@ -166,6 +166,76 @@ FROMX table;
 */
 
 /*markdown
+#### Influencer Content Monetization Performance Analysis
+*/
+
+/*markdown
+##### As a Product Analyst on the Influencer Growth team, you are tasked with analyzing the effectiveness of different content types in generating revenue per engagement. The team is interested in understanding which content types consistently perform well or show a decline in revenue generation. Your insights will help in refining and optimizing content monetization strategies to enhance influencer earnings on the platform.
+*/
+
+/*markdown
+###### For each content type, what is the minimum revenue generated per engagement in the second quarter of 2024?
+*/
+
+WITH cte AS (
+  SELECT content_type, 1.0 * revenue_generated / engagement_count AS rev_per_engagement
+FROM fct_content_engagements
+JOIN dim_content_types
+ON fct_content_engagements.content_id = dim_content_types.content_id
+WHERE engagement_date BETWEEN '2024-04-01' AND '2024-06-31'
+  )
+SELECT content_type, MIN(rev_per_engagement) AS min_rev_per_engagement FROM cte
+GROUP BY 1
+
+/*markdown
+###### For each content type and each month, what is the minimum revenue generated per engagement in the second quarter of 2024?
+*/
+
+WITH cte AS (
+  SELECT content_type, STRFTIME('%m', engagement_date) AS month_num,
+   1.0 * revenue_generated / engagement_count AS rev_per_engagement
+FROM fct_content_engagements
+JOIN dim_content_types
+ON fct_content_engagements.content_id = dim_content_types.content_id
+WHERE engagement_date BETWEEN '2024-04-01' AND '2024-06-31'
+  )
+SELECT content_type, month_num, MIN(rev_per_engagement) AS min_rev_per_engagement FROM cte
+GROUP BY 1, 2
+
+/*markdown
+###### For which content types, did we observe minimum revenue per engagement decline from April 2024 to May 2024, and then decline again from May 2024 to June 2024? This will help us identify content types that we might want to retire due to declining performance.
+*/
+
+WITH cte AS (
+  SELECT content_type, STRFTIME('%m', engagement_date) AS month_num,
+   1.0 * revenue_generated / engagement_count AS rev_per_engagement
+FROM fct_content_engagements
+JOIN dim_content_types
+ON fct_content_engagements.content_id = dim_content_types.content_id
+WHERE engagement_date BETWEEN '2024-04-01' AND '2024-06-31'
+  ), cte2 AS (
+SELECT content_type, month_num,
+   MIN(rev_per_engagement) AS min_rev_per_engagement
+   FROM cte
+GROUP BY 1, 2
+   ), cte3 AS (
+SELECT *, 
+   min_rev_per_engagement -
+   LAG(min_rev_per_engagement, 1) OVER
+   (PARTITION BY content_type ORDER BY month_num ASC)
+      AS change_per_month
+from cte2
+   )
+SELECT content_type, SUM(CASE WHEN change_per_month < 0 THEN 1 END) AS decline
+   FROM cte3 
+GROUP BY 1
+HAVING decline = 2
+
+/*markdown
+Used CTEs, window functions determining rate of change, and conditional aggregates using SUM(CASE).
+*/
+
+/*markdown
 #### Advertiser Campaign Performance by Audience Segments
 */
 
