@@ -180,6 +180,63 @@ FROMX table;
 */
 
 /*markdown
+#### Personal Accounts Refund Dispute Resolution Patterns
+*/
+
+/*markdown
+##### You are a Product Analyst investigating customer refund dispute characteristics across transaction types. Your team wants to optimize the buyer protection process for more efficient resolutions. The goal is to analyze dispute metrics and develop targeted process improvements.
+*/
+
+/*markdown
+###### For disputes involving digital goods (where the product_type begins with ''DIG''), what is the average refund amount for disputes initiated from October 1st to October 7th, 2024? This metric helps quantify the financial impact of digital goods disputes.
+*/
+
+SELECT AVG(refund_amount)
+FROM fct_disputed_transactions
+WHERE product_type LIKE 'DIG%'
+AND dispute_initiated_date BETWEEN '2024-10-01' AND '2024-10-07'
+
+/*markdown
+###### For disputes in October 2024, first find the top 5 transaction categories by the number of disputes. Among these top 5 categories, identify the category among these with the highest average dispute resolution time. Report both the category name and its average resolution time to target process improvements.
+*/
+
+WITH cte AS (
+  SELECT transaction_category, AVG(resolution_time_days) AS avg_resolution_time
+  FROM fct_disputed_transactions
+  WHERE dispute_initiated_date LIKE '2024-10%'
+GROUP BY 1
+  ORDER BY COUNT(*) DESC
+  LIMIT 5
+)
+SELECT transaction_category, avg_resolution_time FROM cte
+ORDER BY 2 DESC
+LIMIT 1
+
+/*markdown
+###### Segment all disputes from October 2024 into quartiles based on the resolution time. What percentage of disputes in the highest resolution time quartile involve physical goods (i.e. product_type values not starting with ''DIG'')? This analysis will guide recommendations to reduce overall dispute resolution time.
+*/
+
+WITH cte AS (
+   SELECT transaction_id, transaction_category,
+      COUNT(*) AS disputes,
+   ntile(4) OVER (ORDER BY resolution_time_days) AS quartile,
+     SUM(CASE
+   WHEN product_type NOT LIKE 'DIG%' THEN 1
+   ELSE 0
+   END)  AS nondig
+FROM fct_disputed_transactions
+WHERE dispute_initiated_date LIKE '2024-10%'
+GROUP BY 1 
+   )
+SELECT 100.*SUM(nondig) / SUM(disputes)  AS nondig_percent
+   FROM cte
+WHERE quartile = 4
+
+/*markdown
+The quartile was simple enough, using SUM(CASE) to aggregate the conditional worked as I expected as well.
+*/
+
+/*markdown
 #### Driver Earnings Optimization for Ride Efficiency
 */
 
