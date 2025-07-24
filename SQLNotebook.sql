@@ -180,6 +180,63 @@ FROMX table;
 */
 
 /*markdown
+#### Apex Legends Weapon and Legend Utilization Analysis
+*/
+
+/*markdown
+##### You are a Product Analyst working with the Game Balance team to evaluate competitive match performance. Your team seeks to understand the current meta of weapon and legend combinations in competitive play. The goal is to identify underutilized and overperforming loadouts to inform potential game balance adjustments.
+*/
+
+/*markdown
+###### What is the total number of matches played using each weapon and legend combination in October 2024?
+*/
+
+SELECT weapon_name, legend_name, COUNT(*)
+FROM fct_matches m
+  JOIN dim_legends l
+  ON m.legend_id = l.legend_id
+  JOIN dim_weapons w
+  ON m.weapon_id = w.weapon_id
+  WHERE match_date LIKE '2024-10%'
+GROUP BY 1, 2
+
+/*markdown
+###### For each weapon, what is the highest number of matches played in a week during October 2024? Return the weapon name and the count of matches.
+*/
+
+WITH cte AS (
+SELECT weapon_name, STRFTIME('%W', match_date) AS weeknum, COUNT(*) AS count_per_week,
+   RANK() OVER (PARTITION BY weapon_name ORDER BY COUNT(*) DESC, STRFTIME('%W', match_date)) AS ranknum
+FROM fct_matches m
+  JOIN dim_legends l
+  ON m.legend_id = l.legend_id
+  JOIN dim_weapons w
+  ON m.weapon_id = w.weapon_id
+  WHERE match_date LIKE '2024-10%'
+GROUP BY 1, 2
+)
+SELECT weapon_name, count_per_week FROM cte WHERE ranknum = 1
+
+/*markdown
+###### Identify the least and most utilized weapon ID and legend ID combinations based on the total matches played in October 2024.
+*/
+
+WITH cte AS (
+  SELECT weapon_id, legend_id, COUNT(*) AS match_count
+FROM fct_matches m
+  WHERE match_date LIKE '2024-10%' 
+GROUP BY weapon_id, legend_id
+  )
+  SELECT * FROM cte
+WHERE match_count = (SELECT MAX(match_count) FROM cte)
+OR match_count = (SELECT MIN(match_count) FROM cte)
+ORDER BY match_count DESC
+
+/*markdown
+Double join, ranked choices, using subqueries to find values tha match min and max. Easy.
+*/
+
+/*markdown
 #### Personal Accounts Refund Dispute Resolution Patterns
 */
 
